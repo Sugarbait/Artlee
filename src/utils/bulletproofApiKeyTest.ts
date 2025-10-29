@@ -241,7 +241,10 @@ if (typeof window !== 'undefined') {
   ;(window as any).bulletproofApiKeyTest = bulletproofApiKeyTest
 }
 
-// Auto-run test in development mode after a delay
+// Auto-run test in development mode DISABLED to prevent test credentials
+// Test credentials were being generated automatically and persisting to localStorage
+// To manually run tests, use: window.bulletproofApiKeyTest.runAllTests()
+/*
 if (import.meta.env.DEV) {
   setTimeout(async () => {
     console.log('🔧 Development mode: Running bulletproof API key test...')
@@ -254,3 +257,4 @@ if (import.meta.env.DEV) {
     console.log('\n💡 To manually run tests, use: window.bulletproofApiKeyTest.runAllTests()')
   }, 3000) // Wait 3 seconds after app initialization
 }
+*/

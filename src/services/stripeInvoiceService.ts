@@ -53,6 +53,13 @@ interface CreateInvoiceOptions {
   sendImmediately?: boolean
   autoFinalize?: boolean
   dueDate?: Date
+  preCalculatedMetrics?: {
+    totalCalls: number
+    callCostCAD: number
+    totalChats: number
+    totalSegments: number
+    smsCostCAD: number
+  }
 }
 
 class StripeInvoiceService {
@@ -101,11 +108,13 @@ class StripeInvoiceService {
       this.isInitialized = true
 
       // Log audit event
-      await AuditService.logAction(
-        'STRIPE_SERVICE_INITIALIZED',
-        'stripe_invoice_service',
-        { success: true }
-      )
+      await AuditService.createSecurityEvent({
+        action: 'STRIPE_SERVICE_INITIALIZED',
+        resource: 'stripe_invoice_service',
+        success: true,
+        details: {},
+        severity: 'low'
+      })
 
       return { success: true }
     } catch (error) {
@@ -266,16 +275,44 @@ class StripeInvoiceService {
       })
 
       if (existingCustomers.data.length > 0) {
-        return existingCustomers.data[0].id
+        const existingCustomer = existingCustomers.data[0]
+
+        // Update customer if name or description has changed
+        const needsUpdate =
+          existingCustomer.name !== customerInfo.name ||
+          existingCustomer.description !== (customerInfo.description || 'CareXPS Business Platform CRM Customer')
+
+        if (needsUpdate) {
+          console.log(`📝 Updating existing Stripe customer ${existingCustomer.id}:`, {
+            oldName: existingCustomer.name,
+            newName: customerInfo.name,
+            oldDescription: existingCustomer.description,
+            newDescription: customerInfo.description || 'CareXPS Business Platform CRM Customer'
+          })
+
+          await this.stripe.customers.update(existingCustomer.id, {
+            name: customerInfo.name,
+            description: customerInfo.description || 'CareXPS Business Platform CRM Customer'
+          })
+        }
+
+        return existingCustomer.id
       }
 
       // Create new customer
+      console.log('✨ Creating new Stripe customer:', {
+        email: customerInfo.email,
+        name: customerInfo.name,
+        description: customerInfo.description || 'CareXPS Business Platform CRM Customer'
+      })
+
       const newCustomer = await this.stripe.customers.create({
         email: customerInfo.email,
         name: customerInfo.name,
         description: customerInfo.description || 'CareXPS Business Platform CRM Customer'
       })
 
+      console.log(`✅ Created new Stripe customer: ${newCustomer.id}`)
       return newCustomer.id
     } catch (error) {
       console.error('Failed to get or create Stripe customer:', error)
@@ -300,11 +337,61 @@ class StripeInvoiceService {
     }
 
     try {
-      // Calculate invoice data
-      const invoiceData = await this.calculateInvoiceData(
-        options.dateRange.start,
-        options.dateRange.end
-      )
+      // Use pre-calculated metrics if provided, otherwise fetch from API
+      let invoiceData: InvoiceData
+
+      if (options.preCalculatedMetrics) {
+        console.log('✅ Using pre-calculated metrics from Dashboard')
+        console.log('📊 Pre-calculated metrics received:', options.preCalculatedMetrics)
+        // Build invoice data from pre-calculated metrics
+        const { totalCalls, callCostCAD, totalChats, totalSegments, smsCostCAD } = options.preCalculatedMetrics
+        console.log('💰 Costs breakdown:', {
+          totalCalls,
+          callCostCAD: `CAD $${callCostCAD.toFixed(2)}`,
+          totalChats,
+          totalSegments,
+          smsCostCAD: `CAD $${smsCostCAD.toFixed(2)}`,
+          combinedTotal: `CAD $${(callCostCAD + smsCostCAD).toFixed(2)}`
+        })
+
+        invoiceData = {
+          dateRange: {
+            start: options.dateRange.start,
+            end: options.dateRange.end,
+            label: options.dateRange.label || `${options.dateRange.start.toLocaleDateString()} - ${options.dateRange.end.toLocaleDateString()}`
+          },
+          callCosts: {
+            totalCalls,
+            totalCostCAD: callCostCAD,
+            items: totalCalls > 0 ? [{
+              description: `Voice Calls (${totalCalls} calls)`,
+              quantity: totalCalls,
+              unit_amount_cents: Math.round((callCostCAD / totalCalls) * 100),
+              amount_total: callCostCAD
+            }] : []
+          },
+          smsCosts: {
+            totalChats,
+            totalSegments,
+            totalCostCAD: smsCostCAD,
+            items: totalChats > 0 ? [{
+              description: `SMS Conversations (${totalChats} chats, ${totalSegments} segments)`,
+              quantity: totalChats,
+              unit_amount_cents: Math.round((smsCostCAD / totalChats) * 100),
+              amount_total: smsCostCAD
+            }] : []
+          },
+          combinedTotal: callCostCAD + smsCostCAD,
+          currency: 'cad'
+        }
+      } else {
+        console.log('📊 Fetching invoice data from API...')
+        // Calculate invoice data from API
+        invoiceData = await this.calculateInvoiceData(
+          options.dateRange.start,
+          options.dateRange.end
+        )
+      }
 
       // Check if there are any charges
       if (invoiceData.combinedTotal <= 0) {
@@ -317,33 +404,13 @@ class StripeInvoiceService {
       // Get or create customer
       const customerId = await this.getOrCreateCustomer(options.customerInfo)
 
-      // Create invoice items
       const stripe = this.stripe!
 
-      // Add call costs
-      for (const item of invoiceData.callCosts.items) {
-        await stripe.invoiceItems.create({
-          customer: customerId,
-          amount: Math.round(item.amount_total * 100), // Convert to cents
-          currency: 'cad',
-          description: item.description
-        })
-      }
-
-      // Add SMS costs
-      for (const item of invoiceData.smsCosts.items) {
-        await stripe.invoiceItems.create({
-          customer: customerId,
-          amount: Math.round(item.amount_total * 100), // Convert to cents
-          currency: 'cad',
-          description: item.description
-        })
-      }
-
-      // Create the invoice
+      // Create the invoice FIRST (as draft)
+      console.log('📝 Creating draft invoice...')
       const invoice = await stripe.invoices.create({
         customer: customerId,
-        auto_advance: options.autoFinalize !== false,
+        auto_advance: false, // Keep as draft initially
         collection_method: 'send_invoice',
         days_until_due: options.dueDate
           ? Math.ceil((options.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -358,31 +425,94 @@ class StripeInvoiceService {
           total_segments: invoiceData.smsCosts.totalSegments.toString()
         }
       })
+      console.log(`✅ Draft invoice created: ${invoice.id}`)
+
+      // Now add invoice items TO THIS SPECIFIC INVOICE
+      console.log('📝 Adding invoice items to invoice:', invoice.id)
+      console.log('📞 Call items:', invoiceData.callCosts.items)
+      console.log('💬 SMS items:', invoiceData.smsCosts.items)
+
+      // Add call costs
+      for (const item of invoiceData.callCosts.items) {
+        const amountInCents = Math.round(item.amount_total * 100)
+        console.log(`📞 Adding call item to Stripe: ${item.description}, CAD $${item.amount_total.toFixed(2)} (${amountInCents} cents)`)
+
+        try {
+          const invoiceItem = await stripe.invoiceItems.create({
+            customer: customerId,
+            invoice: invoice.id, // CRITICAL: Attach to this specific invoice
+            amount: amountInCents,
+            currency: 'cad',
+            description: item.description
+          })
+          console.log(`✅ Call invoice item created successfully: ${invoiceItem.id}, amount: ${invoiceItem.amount} cents`)
+        } catch (itemError) {
+          console.error(`❌ Failed to create call invoice item:`, itemError)
+          throw new Error(`Failed to add call costs to invoice: ${itemError instanceof Error ? itemError.message : 'Unknown error'}`)
+        }
+      }
+
+      // Add SMS costs
+      for (const item of invoiceData.smsCosts.items) {
+        const amountInCents = Math.round(item.amount_total * 100)
+        console.log(`💬 Adding SMS item to Stripe: ${item.description}, CAD $${item.amount_total.toFixed(2)} (${amountInCents} cents)`)
+
+        try {
+          const invoiceItem = await stripe.invoiceItems.create({
+            customer: customerId,
+            invoice: invoice.id, // CRITICAL: Attach to this specific invoice
+            amount: amountInCents,
+            currency: 'cad',
+            description: item.description
+          })
+          console.log(`✅ SMS invoice item created successfully: ${invoiceItem.id}, amount: ${invoiceItem.amount} cents`)
+        } catch (itemError) {
+          console.error(`❌ Failed to create SMS invoice item:`, itemError)
+          throw new Error(`Failed to add SMS costs to invoice: ${itemError instanceof Error ? itemError.message : 'Unknown error'}`)
+        }
+      }
+
+      console.log(`✅ All invoice items added successfully to invoice ${invoice.id}`)
 
       // Finalize and send if requested
+      let finalInvoice = invoice
       if (options.sendImmediately) {
-        await stripe.invoices.finalizeInvoice(invoice.id)
+        console.log('📤 Finalizing invoice...')
+        finalInvoice = await stripe.invoices.finalizeInvoice(invoice.id)
+        console.log('✅ Invoice finalized, hosted URL:', finalInvoice.hosted_invoice_url)
+
+        console.log('📧 Sending invoice to customer via Stripe...')
         await stripe.invoices.sendInvoice(invoice.id)
+        console.log('✅ Invoice sent via Stripe')
       }
 
       // Log audit event
-      await AuditService.logAction(
-        'STRIPE_INVOICE_CREATED',
-        'stripe_invoice',
-        {
-          invoiceId: invoice.id,
+      await AuditService.createSecurityEvent({
+        action: 'STRIPE_INVOICE_CREATED',
+        resource: 'stripe_invoice',
+        success: true,
+        details: {
+          invoiceId: finalInvoice.id,
           customerId,
           totalAmount: invoiceData.combinedTotal,
           currency: 'CAD',
           dateRange: invoiceData.dateRange.label,
-          sentImmediately: options.sendImmediately || false
-        }
-      )
+          sentImmediately: options.sendImmediately || false,
+          invoiceUrl: finalInvoice.hosted_invoice_url || 'Not generated'
+        },
+        severity: 'medium'
+      })
+
+      console.log('📋 Invoice creation complete:', {
+        invoiceId: finalInvoice.id,
+        invoiceUrl: finalInvoice.hosted_invoice_url,
+        status: finalInvoice.status
+      })
 
       return {
         success: true,
-        invoiceId: invoice.id,
-        invoiceUrl: invoice.hosted_invoice_url || undefined
+        invoiceId: finalInvoice.id,
+        invoiceUrl: finalInvoice.hosted_invoice_url || undefined
       }
     } catch (error) {
       console.error('Failed to create Stripe invoice:', error)
@@ -438,6 +568,74 @@ class StripeInvoiceService {
    */
   public async previewInvoice(startDate: Date, endDate: Date): Promise<InvoiceData> {
     return this.calculateInvoiceData(startDate, endDate)
+  }
+
+  /**
+   * Fetch all invoices from Stripe
+   * Used by Invoice History to sync invoices from Stripe to local database
+   */
+  public async fetchAllInvoices(customerEmail?: string, limit: number = 100): Promise<{
+    success: boolean
+    data?: any[]
+    error?: string
+  }> {
+    if (!this.stripe) {
+      return { success: false, error: 'Stripe not initialized' }
+    }
+
+    try {
+      const stripe = this.stripe
+      const queryOptions: any = { limit, expand: ['data.customer'] }
+
+      // Filter by customer email if provided
+      if (customerEmail) {
+        const customers = await stripe.customers.list({
+          email: customerEmail,
+          limit: 1
+        })
+
+        if (customers.data.length === 0) {
+          return { success: true, data: [] }
+        }
+
+        queryOptions.customer = customers.data[0].id
+      }
+
+      // Fetch invoices from Stripe
+      const invoices = await stripe.invoices.list(queryOptions)
+
+      // Transform Stripe format to our format
+      const mappedInvoices = invoices.data.map(invoice => {
+        const customer = invoice.customer as any
+
+        return {
+          id: invoice.id,
+          customer_id: typeof customer === 'string' ? customer : customer?.id || '',
+          customer_email: typeof customer === 'string' ? '' : customer?.email || '',
+          customer_name: typeof customer === 'string' ? '' : customer?.name || '',
+          amount_due: invoice.amount_due / 100, // Convert cents to dollars
+          amount_paid: invoice.amount_paid / 100,
+          amount_remaining: invoice.amount_remaining / 100,
+          currency: invoice.currency.toUpperCase(),
+          status: invoice.status || 'draft',
+          paid: invoice.paid || false,
+          created: invoice.created,
+          due_date: invoice.due_date,
+          hosted_invoice_url: invoice.hosted_invoice_url,
+          invoice_pdf: invoice.invoice_pdf,
+          period_start: invoice.period_start || invoice.created,
+          period_end: invoice.period_end || invoice.created,
+          description: invoice.description
+        }
+      })
+
+      return { success: true, data: mappedInvoices }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch invoices'
+      }
+    }
   }
 }
 

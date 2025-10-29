@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FileText, ExternalLink, Download, Trash2, Calendar, DollarSign, RefreshCw, CloudDownload, CheckCircle, XCircle, Clock, XIcon } from 'lucide-react'
+import { FileText, ExternalLink, Download, Trash2, Calendar, DollarSign, User, Mail, RefreshCw, CloudDownload, CheckCircle, XCircle, Clock, XIcon } from 'lucide-react'
 import { invoiceHistoryService, InvoiceHistoryRecord } from '@/services/invoiceHistoryService'
 import { stripeInvoiceService } from '@/services/stripeInvoiceService'
 import { InvoiceDetailModal } from '@/components/common/InvoiceDetailModal'
@@ -20,8 +20,6 @@ const InvoiceHistorySettings: React.FC = () => {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
-  // HARDCODED: Only show invoices for create@artlee.agency
-  const [customerEmailFilter] = useState<string>('create@artlee.agency')
 
   // Load invoice history from Supabase
   useEffect(() => {
@@ -47,8 +45,13 @@ const InvoiceHistorySettings: React.FC = () => {
       const result = await invoiceHistoryService.getInvoices()
 
       if (result.success && result.data) {
+        // Filter to only show invoices for create@artlee.agency
+        const filteredData = result.data.filter(invoice =>
+          invoice.customer_email === 'create@artlee.agency'
+        )
+
         // Map database records to component format
-        const mappedInvoices = result.data.map(invoice => ({
+        const mappedInvoices = filteredData.map(invoice => ({
           ...invoice,
           invoiceId: invoice.invoice_id,
           timestamp: invoice.generated_at || invoice.created_at || new Date().toISOString(),
@@ -67,7 +70,7 @@ const InvoiceHistorySettings: React.FC = () => {
         })
 
         setInvoices(sortedInvoices)
-        console.log(`✅ Loaded ${sortedInvoices.length} invoices from Supabase (sorted newest first)`)
+        console.log(`✅ Loaded ${sortedInvoices.length} invoices from Supabase (filtered for create@artlee.agency, sorted newest first)`)
       } else {
         // Don't show error for authentication issues (normal during logout)
         if (result.error && !result.error.includes('authenticated')) {
@@ -144,37 +147,31 @@ const InvoiceHistorySettings: React.FC = () => {
 
       if (!initResult.success) {
         setError(initResult.error || 'Failed to initialize Stripe')
-        setToast({ message: initResult.error || 'Failed to initialize Stripe', type: 'error' })
         return
       }
 
-      // Fetch invoices from Stripe (with optional customer email filter)
-      const fetchResult = await stripeInvoiceService.fetchAllInvoices(
-        customerEmailFilter || undefined,
-        100
-      )
+      // Fetch invoices from Stripe (filtered for create@artlee.agency only)
+      const fetchResult = await stripeInvoiceService.fetchAllInvoices('create@artlee.agency', 100)
 
       if (!fetchResult.success || !fetchResult.data) {
         setError(fetchResult.error || 'Failed to fetch invoices from Stripe')
-        setToast({ message: fetchResult.error || 'Failed to fetch invoices from Stripe', type: 'error' })
         return
       }
 
-      console.log(`📥 Fetched ${fetchResult.data.length} invoices from Stripe${customerEmailFilter ? ` for ${customerEmailFilter}` : ''}`)
+      console.log(`📥 Fetched ${fetchResult.data.length} invoices from Stripe for create@artlee.agency`)
 
       // Sync to local database
       const syncResult = await invoiceHistoryService.syncFromStripe(fetchResult.data)
 
       if (!syncResult.success) {
         setError(syncResult.error || 'Failed to sync invoices')
-        setToast({ message: syncResult.error || 'Failed to sync invoices', type: 'error' })
         return
       }
 
       // Reload invoice history
       await loadInvoiceHistory()
 
-      console.log(`✅ Successfully synced ${syncResult.synced} invoices from Stripe`)
+      console.log(`✅ Successfully synced ${syncResult.synced} invoices from Stripe for create@artlee.agency`)
       setToast({ message: `Successfully synced ${syncResult.synced} invoices from Stripe`, type: 'success' })
     } catch (error) {
       console.error('Failed to sync from Stripe:', error)
@@ -193,14 +190,12 @@ const InvoiceHistorySettings: React.FC = () => {
       const url = URL.createObjectURL(dataBlob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `artlee-invoice-history-${new Date().toISOString().split('T')[0]}.json`
+      link.download = `invoice-history-${new Date().toISOString().split('T')[0]}.json`
       link.click()
       URL.revokeObjectURL(url)
       console.log('📥 Invoice history exported')
-      setToast({ message: 'Invoice history exported successfully', type: 'success' })
     } catch (error) {
       console.error('Failed to export invoice history:', error)
-      setToast({ message: 'Failed to export invoice history', type: 'error' })
     }
   }
 
@@ -241,11 +236,6 @@ const InvoiceHistorySettings: React.FC = () => {
       </span>
     )
   }
-
-  // Filter invoices by customer email
-  const filteredInvoices = customerEmailFilter
-    ? invoices.filter(inv => inv.email?.toLowerCase().includes(customerEmailFilter.toLowerCase()))
-    : invoices
 
   return (
     <div className="space-y-6">
@@ -306,7 +296,7 @@ const InvoiceHistorySettings: React.FC = () => {
           <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-blue-600" />
             <div>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{filteredInvoices.length}</div>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{invoices.length}</div>
               <div className="text-xs text-blue-700 dark:text-blue-300">Total Invoices</div>
             </div>
           </div>
@@ -317,8 +307,8 @@ const InvoiceHistorySettings: React.FC = () => {
             <DollarSign className="w-8 h-8 text-green-600" />
             <div>
               <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-                {filteredInvoices.length > 0
-                  ? filteredInvoices.reduce((sum, inv) => {
+                {invoices.length > 0
+                  ? invoices.reduce((sum, inv) => {
                       // Try to get amount from different fields
                       const amountStr = inv.amount || `${inv.total_cost_cad || 0}`
                       const amount = parseFloat(amountStr.toString().replace(/[^0-9.-]+/g, ''))
@@ -336,8 +326,8 @@ const InvoiceHistorySettings: React.FC = () => {
             <Calendar className="w-8 h-8 text-purple-600" />
             <div>
               <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                {filteredInvoices.length > 0
-                  ? new Date(filteredInvoices[0].timestamp).toLocaleDateString()
+                {invoices.length > 0
+                  ? new Date(invoices[0].timestamp).toLocaleDateString()
                   : 'N/A'}
               </div>
               <div className="text-xs text-purple-700 dark:text-purple-300">Latest Invoice</div>
@@ -347,14 +337,12 @@ const InvoiceHistorySettings: React.FC = () => {
       </div>
 
       {/* Invoice List */}
-      {filteredInvoices.length === 0 ? (
+      {invoices.length === 0 ? (
         <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-12 text-center">
           <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Invoices Found</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            {customerEmailFilter
-              ? `No invoices found for "${customerEmailFilter}". Generate a new invoice or sync from Stripe to see results.`
-              : 'No invoices found. Click "Sync from Stripe" to fetch invoices from your Stripe account.'}
+            No invoices found. Click "Sync from Stripe" to fetch invoices from your Stripe account.
           </p>
         </div>
       ) : (
@@ -384,7 +372,7 @@ const InvoiceHistorySettings: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredInvoices.map((invoice) => (
+                {invoices.map((invoice) => (
                   <tr
                     key={invoice.invoiceId}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
@@ -415,9 +403,9 @@ const InvoiceHistorySettings: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {invoice.invoice_url && (
+                        {invoice.invoiceUrl && (
                           <a
-                            href={invoice.invoice_url}
+                            href={invoice.invoiceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
@@ -490,4 +478,4 @@ const InvoiceHistorySettings: React.FC = () => {
   )
 }
 
-export default InvoiceHistorySettings
+export { InvoiceHistorySettings }

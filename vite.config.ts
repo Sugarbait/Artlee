@@ -84,9 +84,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'CareXPS Healthcare CRM',
-        short_name: 'CareXPS',
-        description: 'HIPAA-compliant healthcare CRM with Retell AI integration',
+        name: 'ARTLEE Business CRM',
+        short_name: 'ARTLEE',
+        description: 'Business platform CRM with Retell AI integration',
         theme_color: '#0056B3',
         background_color: '#ffffff',
         display: 'standalone',
@@ -158,7 +158,7 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000,
+    port: 2222,
     headers: {
       'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
       'X-Content-Type-Options': 'nosniff',

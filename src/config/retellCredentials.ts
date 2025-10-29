@@ -1,10 +1,10 @@
 /**
  * Retell AI API Credentials Configuration
  *
- * For Phaeton AI CRM, no credentials are hardcoded.
- * Users must configure their own API keys via Settings > API Configuration.
+ * For ARTLEE CRM, hardcoded credentials are provided as fallback.
+ * Users can also configure their own API keys via Settings > API Configuration.
  *
- * This file provides the structure and validation utilities only.
+ * This file provides credential fallbacks and validation utilities.
  */
 
 export interface RetellCredentials {
@@ -14,10 +14,10 @@ export interface RetellCredentials {
 }
 
 /**
- * Phaeton AI CRM - User Configuration Required
+ * ARTLEE CRM - Production Credentials
  *
- * No hardcoded credentials for Phaeton AI CRM.
- * Users configure their own Retell AI credentials via Settings > API Configuration.
+ * Hardcoded credentials provided as fallback for ARTLEE CRM.
+ * Users can also configure their own Retell AI credentials via Settings > API Configuration.
  *
  * Credentials are stored in:
  * - localStorage (primary)
@@ -29,31 +29,30 @@ export interface RetellCredentials {
  * 3. SMS Agent ID (format: agent_xxxxxxxxxxxxxxxxxxxxx - optional)
  */
 /**
- * Phaeton AI CRM - Production Credentials
- * Last Updated: 2025-10-10
+ * ARTLEE CRM - Production Credentials
+ * Last Updated: 2025-10-29
  *
- * IMPORTANT: No hardcoded credentials for Phaeton AI CRM - users configure their own
+ * IMPORTANT: Hardcoded credentials for ARTLEE CRM - working production values
  */
 export const HARDCODED_RETELL_CREDENTIALS: RetellCredentials = {
-  // Retell AI API Key - User must configure via Settings
-  apiKey: '',
+  // Retell AI API Key - ARTLEE Production
+  apiKey: 'key_3660938283961c067186004a50e3',
 
-  // Call Agent ID for voice interactions - User must configure via Settings
-  callAgentId: '',
+  // Call Agent ID for voice interactions - ARTLEE Production
+  callAgentId: 'agent_ca2a01536c2e94d0ff4e50df70',
 
-  // SMS/Chat Agent ID for text-based interactions - User must configure via Settings
+  // SMS/Chat Agent ID for text-based interactions - Empty (user must configure)
   smsAgentId: ''
 }
 
 /**
  * Credential validation utility
  * Note: SMS Agent ID is optional - can be empty string if SMS functionality is not configured
- * Note: All credentials are optional for Phaeton AI CRM (user must configure)
  */
 export function validateCredentials(credentials: Partial<RetellCredentials>): boolean {
-  // For Phaeton AI CRM, allow empty credentials (user will configure their own)
+  // Allow empty credentials (will fall back to hardcoded values)
   if (!credentials.apiKey && !credentials.callAgentId && !credentials.smsAgentId) {
-    return true // All empty is valid - waiting for user configuration
+    return true
   }
 
   const hasValidApiKey = !!(credentials.apiKey && credentials.apiKey.startsWith('key_'))
@@ -65,14 +64,13 @@ export function validateCredentials(credentials: Partial<RetellCredentials>): bo
 
 /**
  * Get bulletproof credentials with validation
- * Note: For Phaeton AI CRM, returns empty credentials (user must configure)
+ * Returns hardcoded production credentials for ARTLEE CRM
  */
 export function getBulletproofCredentials(): RetellCredentials {
-  // For Phaeton AI CRM, return empty credentials - user will configure their own
   const credentials = { ...HARDCODED_RETELL_CREDENTIALS }
 
-  console.log('🔐 Phaeton AI: No hardcoded credentials - user must configure via Settings')
-  // Security: Do not log API keys or Agent IDs
+  console.log('🔐 ARTLEE: Loaded hardcoded production credentials')
+  // Security: Do not log actual API keys or Agent IDs
 
   return credentials
 }
@@ -161,10 +159,8 @@ export function initializeCredentialPersistence(): void {
   console.log('🚀 Hardcoded credential persistence initialized')
 }
 
-// Auto-initialization DISABLED - User-entered credentials take priority
-// The hardcoded credentials above serve only as documentation/reference
-// Users must configure their own credentials via Settings > API Configuration
-/*
+// Auto-initialization ENABLED - Hardcoded credentials loaded on startup
+// User-configured credentials from Settings will override these fallback values
 if (typeof window !== 'undefined') {
   // Initialize after a short delay to ensure all systems are ready
   setTimeout(() => {
@@ -175,4 +171,3 @@ if (typeof window !== 'undefined') {
     }
   }, 100)
 }
-*/

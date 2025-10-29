@@ -97,10 +97,10 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
   }, [user.id])
 
   const forceHardwiredCredentials = () => {
-    console.log('🔧 API KEY MANAGEMENT: Loading stored credentials (Phaeton AI CRM)')
+    console.log('🔧 API KEY MANAGEMENT: Loading stored credentials (ARTLEE CRM)')
 
-    // Don't force any hardwired credentials - this is Phaeton AI CRM, not ARTLEE
-    // Just load what's in localStorage
+    // Don't force any hardwired credentials - just load from localStorage IF they're valid
+    // Skip test credentials - they should come from Supabase instead
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
       if (currentUser.id) {
@@ -112,7 +112,19 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
           sms_agent_id: settings.smsAgentId || ''
         }
 
-        // Set in component state
+        // 🔍 CRITICAL: Detect and skip test credentials
+        const isTestCredentials =
+          storedApiKeys.retell_api_key.startsWith('test_key_') ||
+          storedApiKeys.call_agent_id.startsWith('test_call_agent_') ||
+          storedApiKeys.sms_agent_id.startsWith('test_sms_agent_')
+
+        if (isTestCredentials) {
+          console.log('⚠️ API KEY MANAGEMENT: Test credentials detected in localStorage - skipping')
+          console.log('   Will load real credentials from Supabase instead')
+          return // Don't load test credentials, let loadApiKeys() fetch from Supabase
+        }
+
+        // Set in component state (only if NOT test credentials)
         setApiKeys(storedApiKeys)
         setOriginalApiKeys({ ...storedApiKeys })
 
@@ -148,45 +160,67 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
     try {
       console.log('Loading API keys for user:', user.id)
 
-      // First, try to load from localStorage (primary, reliable source)
+      // First, check localStorage but skip test credentials
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+      let shouldLoadFromSupabase = true
+
       if (currentUser.id) {
         const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
 
         if (settings.retellApiKey && !settings.retellApiKey.includes('cbc:')) {
-          // Found plain text API key in localStorage - use it
-          console.log('Found plain text API key in localStorage:', {
-            hasApiKey: !!settings.retellApiKey,
-            apiKeyLength: settings.retellApiKey?.length || 0,
-            apiKeyPrefix: settings.retellApiKey ? settings.retellApiKey.substring(0, 15) + '...' : 'none',
-            callAgentId: settings.callAgentId || 'not set',
-            smsAgentId: settings.smsAgentId || 'not set'
-          })
+          // Check if these are test credentials
+          const isTestCredentials =
+            settings.retellApiKey.startsWith('test_key_') ||
+            (settings.callAgentId && settings.callAgentId.startsWith('test_call_agent_')) ||
+            (settings.smsAgentId && settings.smsAgentId.startsWith('test_sms_agent_'))
 
-          const localApiKeys = {
-            retell_api_key: settings.retellApiKey || '',
-            call_agent_id: settings.callAgentId || '',
-            sms_agent_id: settings.smsAgentId || ''
+          if (isTestCredentials) {
+            console.log('⚠️ Test credentials detected in localStorage - will load from Supabase instead')
+            console.log('   Test credentials:', {
+              apiKeyPrefix: settings.retellApiKey ? settings.retellApiKey.substring(0, 20) + '...' : 'none',
+              callAgentId: settings.callAgentId || 'not set',
+              smsAgentId: settings.smsAgentId || 'not set'
+            })
+            shouldLoadFromSupabase = true
+          } else {
+            // Found valid plain text API key in localStorage - use it
+            console.log('Found valid plain text API key in localStorage:', {
+              hasApiKey: !!settings.retellApiKey,
+              apiKeyLength: settings.retellApiKey?.length || 0,
+              apiKeyPrefix: settings.retellApiKey ? settings.retellApiKey.substring(0, 15) + '...' : 'none',
+              callAgentId: settings.callAgentId || 'not set',
+              smsAgentId: settings.smsAgentId || 'not set'
+            })
+
+            const localApiKeys = {
+              retell_api_key: settings.retellApiKey || '',
+              call_agent_id: settings.callAgentId || '',
+              sms_agent_id: settings.smsAgentId || ''
+            }
+
+            setApiKeys(localApiKeys)
+            // Update original state to match loaded values
+            setOriginalApiKeys({ ...localApiKeys })
+
+            // Update retell service
+            retellService.updateCredentials(
+              localApiKeys.retell_api_key,
+              localApiKeys.call_agent_id,
+              localApiKeys.sms_agent_id
+            )
+
+            console.log('Loaded API keys from localStorage successfully')
+            setIsLoading(false)
+            shouldLoadFromSupabase = false
           }
-
-          setApiKeys(localApiKeys)
-          // Update original state to match loaded values
-          setOriginalApiKeys({ ...localApiKeys })
-
-          // Update retell service
-          retellService.updateCredentials(
-            localApiKeys.retell_api_key,
-            localApiKeys.call_agent_id,
-            localApiKeys.sms_agent_id
-          )
-
-          console.log('Loaded API keys from localStorage successfully')
-          setIsLoading(false)
-          return
         }
       }
 
-      console.log('No valid localStorage keys found, trying service layer...')
+      if (!shouldLoadFromSupabase) {
+        return
+      }
+
+      console.log('Loading API keys from Supabase (primary source)...')
 
       // Fallback: try to load from service (may return encrypted keys)
       const response = await enhancedUserService.getUserApiKeys(user.id)
@@ -246,6 +280,17 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
           setApiKeys(loadedApiKeys)
           // Update original state to match loaded values
           setOriginalApiKeys({ ...loadedApiKeys })
+
+          // 🔄 CRITICAL: Update localStorage cache with real credentials from Supabase
+          // This replaces any test credentials that were stored
+          if (currentUser.id) {
+            const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
+            settings.retellApiKey = loadedApiKeys.retell_api_key
+            settings.callAgentId = loadedApiKeys.call_agent_id
+            settings.smsAgentId = loadedApiKeys.sms_agent_id
+            localStorage.setItem(`settings_${currentUser.id}`, JSON.stringify(settings))
+            console.log('✅ Updated localStorage cache with real credentials from Supabase')
+          }
 
           // Update retell service
           retellService.updateCredentials(

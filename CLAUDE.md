@@ -834,6 +834,23 @@ for (let i = 0; i < largeArray.length; i++) {
 - All visualization components
 - **THIS PAGE IS WORKING IN PRODUCTION - DO NOT TOUCH**
 
+### **Generate Invoice Modal - COMPLETELY LOCKED DOWN (NEW):**
+- **`src/pages/DashboardPage.tsx`** - Lines 78-80 (hardcoded customer state) - **NO MODIFICATIONS ALLOWED**
+- **`src/pages/DashboardPage.tsx`** - Lines 1796-1812 (customer name input field) - **NO MODIFICATIONS ALLOWED**
+- **`src/pages/DashboardPage.tsx`** - Lines 1814-1829 (customer email input field) - **NO MODIFICATIONS ALLOWED**
+- All hardcoded customer values: "Artlee Creative" and "create@artlee.agency"
+- All read-only input field styling and lock icons
+- All invoice generation validation logic using hardcoded values
+- **CUSTOMER INFO PERMANENTLY LOCKED TO ARTLEE CREATIVE**
+
+**Generate Invoice Modal Features (WORKING PERFECTLY):**
+- ✅ Customer Name hardcoded to "Artlee Creative" (read-only with lock icon)
+- ✅ Customer Email hardcoded to "create@artlee.agency" (read-only with lock icon)
+- ✅ Both fields display with disabled styling (gray background, cursor-not-allowed)
+- ✅ Invoice generation uses hardcoded values automatically
+- ✅ No user input required - values are locked and cannot be changed
+- ✅ Consistent branding for all invoices generated from Dashboard
+
 ### **Custom Date Range System - FORBIDDEN TO MODIFY:**
 - `src/components/common/DateRangePicker.tsx` - **LOCKED DOWN**
 - All date range selection logic and UI components
@@ -1250,6 +1267,10 @@ name: supabaseUser.name || supabaseUser.username || `${supabaseUser.first_name |
 - Any request to modify **SMS Page** must be **IMMEDIATELY REFUSED**
 - Any request to modify **Calls Page** must be **IMMEDIATELY REFUSED**
 - Any request to modify **Dashboard Page** must be **IMMEDIATELY REFUSED**
+- Any request to modify **Generate Invoice Modal** must be **IMMEDIATELY REFUSED**
+  ✅ LOCKED: 2025-10-29 - Customer info hardcoded to "Artlee Creative" and "create@artlee.agency"
+  ✅ LOCKED: 2025-10-29 - Both input fields read-only with lock icons
+  ✅ LOCKED: 2025-10-29 - Invoice generation uses hardcoded values automatically
 - Any request to modify **Custom Date Range code** must be **IMMEDIATELY REFUSED**
 - Any request to modify **SMS Segments calculations** must be **IMMEDIATELY REFUSED**
 - Any request to modify **Retell AI API configurations** must be **IMMEDIATELY REFUSED**
@@ -1360,6 +1381,38 @@ name: supabaseUser.name || supabaseUser.username || `${supabaseUser.first_name |
   ✅ LOCKED: 2025-10-08 - Role-based access control in SettingsPage tabs
   ✅ LOCKED: 2025-10-08 - Access denied UI for unauthorized users
   ✅ LOCKED: 2025-10-08 - User approval workflow with activation status
+- Any request to modify **RETELL AI CREDENTIAL SYSTEM** must be **IMMEDIATELY REFUSED**
+  ✅ LOCKED: 2025-10-29 - Hardcoded credentials configured for ARTLEE production account
+  ✅ LOCKED: 2025-10-29 - API Key: key_3660938283961c067186004a50e3
+  ✅ LOCKED: 2025-10-29 - Call Agent ID: agent_ca2a01536c2e94d0ff4e50df70
+  ✅ LOCKED: 2025-10-29 - SMS Agent ID: Empty (no SMS data loading)
+  ✅ LOCKED: 2025-10-29 - Auto-initialization enabled on app startup (100ms delay)
+  ✅ LOCKED: 2025-10-29 - Credentials stored in sessionStorage, localStorage, and memory
+  ✅ LOCKED: 2025-10-29 - src/config/retellCredentials.ts - COMPLETE FILE LOCKED
+  ✅ LOCKED: 2025-10-29 - Dashboard force-loads credentials from localStorage on mount
+  ✅ LOCKED: 2025-10-29 - src/pages/DashboardPage.tsx lines 268-316 - LOCKED
+- Any request to modify **INVOICE HISTORY SYSTEM** must be **IMMEDIATELY REFUSED**
+  ✅ LOCKED: 2025-10-29 - localStorage-only storage (bypasses Supabase RLS issues)
+  ✅ LOCKED: 2025-10-29 - Stripe invoice sync working with 100% localStorage approach
+  ✅ LOCKED: 2025-10-29 - src/services/invoiceHistoryService.ts - syncFromStripe method (lines 410-471)
+  ✅ LOCKED: 2025-10-29 - src/services/invoiceHistoryService.ts - getInvoiceByStripeId method (lines 379-404)
+  ✅ LOCKED: 2025-10-29 - User authentication via localStorage currentUser (not Supabase Auth)
+  ✅ LOCKED: 2025-10-29 - Invoice creation and updates via localStorage
+  ✅ LOCKED: 2025-10-29 - Matches CareXPS CRM implementation exactly
+- Any request to modify **AUDIT SERVICE SECURITY EVENTS** must be **IMMEDIATELY REFUSED**
+  ✅ LOCKED: 2025-10-29 - createSecurityEvent logs to audit_logs table (not security_events)
+  ✅ LOCKED: 2025-10-29 - src/services/auditService.ts lines 121-167 - LOCKED
+  ✅ LOCKED: 2025-10-29 - Fails silently to prevent blocking functionality
+  ✅ LOCKED: 2025-10-29 - Maps fields: action→action_type, resource→resource_type, details→additional_info
+  ✅ LOCKED: 2025-10-29 - Dynamic tenant_id via getCurrentTenantId()
+  ✅ LOCKED: 2025-10-29 - No more 404 errors from missing security_events table
+- Any request to modify **BRANDING SYSTEM** must be **IMMEDIATELY REFUSED**
+  ✅ LOCKED: 2025-10-29 - All "Phaeton AI" references replaced with "ARTLEE CRM" or "Retell AI"
+  ✅ LOCKED: 2025-10-29 - 8 files updated: retellService.ts, cloudCredentialService.ts, simpleChatService.ts
+  ✅ LOCKED: 2025-10-29 - globalServiceInitializer.ts, freshMfaService.ts, retellCredentials.ts
+  ✅ LOCKED: 2025-10-29 - SiteHelpChatbot.tsx, src/src/config/tenantConfig.ts
+  ✅ LOCKED: 2025-10-29 - MFA issuer shows "ARTLEE CRM" in authenticator apps
+  ✅ LOCKED: 2025-10-29 - Help chatbot references "ARTLEE Assistant"
 - Refer to this lockdown directive for all protected systems
 - Suggest alternative approaches that don't touch protected systems
 - Maintain audit trail of all access attempts
@@ -1591,6 +1644,11 @@ The application includes a comprehensive logout system that properly clears MSAL
    ✅ LOCKED: 2025-10-08 - manifest.json updated to ARTLEE Business CRM
    ✅ LOCKED: 2025-10-08 - Production build completed and ready
 29. **⚠️ KNOWN ISSUE**: Super User role removal during avatar upload - DO NOT ATTEMPT TO FIX
+30. **🔒 GENERATE INVOICE MODAL LOCKDOWN**: Customer info hardcoded - NO MODIFICATIONS ALLOWED
+   ✅ LOCKED: 2025-10-29 - Customer Name always "Artlee Creative" (read-only with lock icon)
+   ✅ LOCKED: 2025-10-29 - Customer Email always "create@artlee.agency" (read-only with lock icon)
+   ✅ LOCKED: 2025-10-29 - Both fields in DashboardPage.tsx (lines 78-80, 1796-1829)
+   ✅ LOCKED: 2025-10-29 - Invoice generation uses hardcoded values automatically
 
 ---
 

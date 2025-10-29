@@ -197,7 +197,7 @@ class RetellService {
    */
   private async loadCredentialsInternal(): Promise<void> {
     try {
-      console.log('🔄 Phaeton AI: Loading user-configured credentials...')
+      console.log('🔄 Retell AI: Loading user-configured credentials...')
 
       // PRIORITY 1: Load from currentUser localStorage (user-configured keys)
       let credentials = this.loadFromCurrentUser()
@@ -223,7 +223,7 @@ class RetellService {
           const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
           const cloudCreds = await cloudCredentialService.getCredentialsWithFallback(currentUser.id)
           if (validateCredentials(cloudCreds)) {
-            console.log('☁️ Phaeton AI - Found credentials in cloud storage')
+            console.log('☁️ Retell AI - Found credentials in cloud storage')
             credentials = {
               apiKey: cloudCreds.apiKey,
               callAgentId: cloudCreds.callAgentId,
@@ -231,11 +231,11 @@ class RetellService {
             }
           }
         } catch (cloudError) {
-          console.warn('⚠️ Phaeton AI - Cloud credential loading failed:', cloudError)
+          console.warn('⚠️ Retell AI - Cloud credential loading failed:', cloudError)
         }
       }
 
-      // Note: No hardcoded fallback for Phaeton AI - user must configure via Settings
+      // Note: No hardcoded fallback for Retell AI - user must configure via Settings
 
       // Apply loaded credentials
       this.apiKey = credentials.apiKey || this.apiKey
@@ -253,7 +253,7 @@ class RetellService {
 
       this.isInitialized = true
 
-      console.log('✅ Phaeton AI - Credentials loaded:', {
+      console.log('✅ Retell AI - Credentials loaded:', {
         hasApiKey: !!this.apiKey,
         apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 15) + '...' : 'none',
         callAgentId: this.callAgentId || 'not set',
@@ -278,7 +278,7 @@ class RetellService {
         const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
         // Check if retellApiKey property exists (even if blank)
         if ('retellApiKey' in settings) {
-          console.log('🎯 Phaeton AI - Found credentials via currentUser')
+          console.log('🎯 Retell AI - Found credentials via currentUser')
           return {
             apiKey: settings.retellApiKey || '',
             callAgentId: settings.callAgentId || '',
@@ -287,7 +287,7 @@ class RetellService {
         }
       }
     } catch (error) {
-      console.warn('Phaeton AI - Error loading from currentUser:', error)
+      console.warn('Retell AI - Error loading from currentUser:', error)
     }
     return {apiKey: '', callAgentId: '', smsAgentId: ''}
   }
@@ -409,7 +409,7 @@ class RetellService {
         timestamp: Date.now()
       }))
     } catch (error) {
-      console.warn('Phaeton AI - Error saving to sessionStorage:', error)
+      console.warn('Retell AI - Error saving to sessionStorage:', error)
     }
   }
 
@@ -795,8 +795,8 @@ class RetellService {
     } catch (error) {
       console.error('❌ Fresh RetellService - Force update failed:', error)
 
-      // Phaeton AI CRM: No hardcoded fallback - user must configure credentials
-      console.log('⚠️ Phaeton AI: No hardcoded credentials available - user must configure via Settings')
+      // Retell AI CRM: No hardcoded fallback - user must configure credentials
+      console.log('⚠️ Retell AI: No hardcoded credentials available - user must configure via Settings')
       this.updateCredentials('', '', '')
     }
   }
@@ -846,9 +846,9 @@ class RetellService {
       }
 
       await cloudCredentialService.syncUserCredentialsToCloud(currentUser.id, credentials)
-      console.log('✅ Phaeton AI - Credentials synced to cloud successfully (including blank values)')
+      console.log('✅ Retell AI - Credentials synced to cloud successfully (including blank values)')
     } catch (error) {
-      console.warn('⚠️ Phaeton AI - Failed to sync credentials to cloud:', error)
+      console.warn('⚠️ Retell AI - Failed to sync credentials to cloud:', error)
     }
   }
 

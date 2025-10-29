@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent ID Diagnostic Tool</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #00ff88;
+      border-bottom: 2px solid #00ff88;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #00ccff;
+      margin-top: 30px;
+    }
+    .section {
+      background: #16213e;
+      border: 1px solid #00ff88;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .result {
+      background: #0f3460;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 10px 0;
+      border-left: 4px solid #00ff88;
+    }
+    .error {
+      border-left-color: #ff4444;
+      background: #3a1f1f;
+    }
+    .success {
+      border-left-color: #00ff88;
+    }
+    .warning {
+      border-left-color: #ffaa00;
+      background: #3a2f1f;
+    }
+    pre {
+      background: #0a0a0a;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+      border: 1px solid #333;
+    }
+    button {
+      background: #00ff88;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #00ccff;
+    }
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    input {
+      background: #0f3460;
+      color: #eee;
+      border: 1px solid #00ff88;
+      padding: 10px;
+      border-radius: 5px;
+      width: 100%;
+      margin: 10px 0;
+      font-family: 'Courier New', monospace;
+    }
+    .key {
+      color: #00ccff;
+      font-weight: bold;
+    }
+    .value {
+      color: #ffaa00;
+    }
+    .null {
+      color: #888;
+      font-style: italic;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .badge-found {
+      background: #00ff88;
+      color: #000;
+    }
+    .badge-missing {
+      background: #ff4444;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Agent ID Persistence Diagnostic Tool</h1>
+
+  <div class="section">
+    <h2>Configuration</h2>
+    <label>
+      <strong>Supabase URL:</strong>
+      <input type="text" id="supabaseUrl" placeholder="https://fslniuhyunzlfcbxsiol.supabase.co">
+    </label>
+    <label>
+      <strong>Supabase Anon Key:</strong>
+      <input type="password" id="supabaseKey" placeholder="Your anon key">
+    </label>
+    <label>
+      <strong>User ID:</strong>
+      <input type="text" id="userId" value="edd07847-d90a-4b1a-9904-e6bc752ff501">
+    </label>
+    <label>
+      <strong>Tenant ID:</strong>
+      <input type="text" id="tenantId" value="artlee">
+    </label>
+    <button onclick="runDiagnostics()">🚀 Run Full Diagnostics</button>
+    <button onclick="clearResults()">🗑️ Clear Results</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    let supabase = null;
+
+    function getConfig() {
+      return {
+        url: document.getElementById('supabaseUrl').value,
+        key: document.getElementById('supabaseKey').value,
+        userId: document.getElementById('userId').value,
+        tenantId: document.getElementById('tenantId').value
+      };
+    }
+
+    function initSupabase() {
+      const config = getConfig();
+      if (!config.url || !config.key) {
+        throw new Error('Supabase URL and Key are required');
+      }
+      supabase = window.supabase.createClient(config.url, config.key);
+      return supabase;
+    }
+
+    function addResult(title, content, type = 'result') {
+      const resultsDiv = document.getElementById('results');
+      const section = document.createElement('div');
+      section.className = 'section';
+      section.innerHTML = `<h2>${title}</h2><div class="${type}">${content}</div>`;
+      resultsDiv.appendChild(section);
+    }
+
+    function formatJSON(obj) {
+      if (obj === null) return '<span class="null">null</span>';
+      if (obj === undefined) return '<span class="null">undefined</span>';
+
+      let html = '<pre>';
+      const stringified = JSON.stringify(obj, null, 2);
+
+      // Highlight keys and values
+      html += stringified
+        .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+        .replace(/: "([^"]*)"/g, ': <span class="value">"$1"</span>')
+        .replace(/: null/g, ': <span class="null">null</span>')
+        .replace(/: true/g, ': <span class="value">true</span>')
+        .replace(/: false/g, ': <span class="value">false</span>');
+
+      html += '</pre>';
+      return html;
+    }
+
+    function getBadge(found) {
+      return found
+        ? '<span class="badge badge-found">FOUND</span>'
+        : '<span class="badge badge-missing">MISSING</span>';
+    }
+
+    async function checkUserProfiles(userId, tenantId) {
+      try {
+        console.log('🔍 Checking user_profiles table...');
+
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('tenant_id', tenantId)
+          .single();
+
+        if (error) throw error;
+
+        const hasApiKey = !!data?.encrypted_retell_api_key;
+        const hasAgentConfig = !!data?.encrypted_agent_config;
+
+        let analysis = `
+          <p><strong>Record Found:</strong> ${data ? '✅ YES' : '❌ NO'}</p>
+          <p><strong>encrypted_retell_api_key:</strong> ${getBadge(hasApiKey)}</p>
+          <p><strong>encrypted_agent_config:</strong> ${getBadge(hasAgentConfig)}</p>
+        `;
+
+        if (hasAgentConfig) {
+          const config = data.encrypted_agent_config;
+          analysis += `
+            <p><strong>Agent Config Contents:</strong></p>
+            <ul>
+              <li>call_agent_id: ${config.call_agent_id || '<span class="null">null</span>'}</li>
+              <li>sms_agent_id: ${config.sms_agent_id || '<span class="null">null</span>'}</li>
+            </ul>
+          `;
+        }
+
+        analysis += '<p><strong>Full Record:</strong></p>' + formatJSON(data);
+
+        addResult('1️⃣ user_profiles Table', analysis, hasAgentConfig ? 'result success' : 'result warning');
+        return { success: true, data, hasAgentConfig };
+
+      } catch (error) {
+        console.error('Error checking user_profiles:', error);
+        addResult('1️⃣ user_profiles Table',
+          `<p class="error">❌ Error: ${error.message}</p>` + formatJSON(error),
+          'result error');
+        return { success: false, error: error.message };
+      }
+    }
+
+    async function checkUserSettings(userId, tenantId) {
+      try {
+        console.log('🔍 Checking user_settings table...');
+
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('tenant_id', tenantId)
+          .single();
+
+        if (error) throw error;
+
+        const hasRetellConfig = !!data?.retell_config;
+        const hasRetellAgentConfig = !!data?.retell_agent_config;
+        const hasEncryptedKeys = !!data?.encrypted_retell_keys;
+        const hasApiKeyTimestamp = !!data?.api_key_updated_at;
+
+        let analysis = `
+          <p><strong>Record Found:</strong> ${data ? '✅ YES' : '❌ NO'}</p>
+          <p><strong>retell_config (JSONB):</strong> ${getBadge(hasRetellConfig)}</p>
+          <p><strong>retell_agent_config (JSONB):</strong> ${getBadge(hasRetellAgentConfig)}</p>
+          <p><strong>encrypted_retell_keys (JSONB):</strong> ${getBadge(hasEncryptedKeys)}</p>
+          <p><strong>api_key_updated_at:</strong> ${getBadge(hasApiKeyTimestamp)}</p>
+        `;
+
+        if (hasRetellConfig) {
+          const config = data.retell_config;
+          analysis += `
+            <p><strong>retell_config Contents:</strong></p>
+            <ul>
+              <li>api_key: ${config.api_key ? `${config.api_key.substring(0, 10)}...` : '<span class="null">null</span>'}</li>
+              <li>call_agent_id: ${config.call_agent_id || '<span class="null">null</span>'}</li>
+              <li>sms_agent_id: ${config.sms_agent_id || '<span class="null">null</span>'}</li>
+            </ul>
+          `;
+        }
+
+        if (hasRetellAgentConfig) {
+          const agentConfig = data.retell_agent_config;
+          analysis += `
+            <p><strong>retell_agent_config Contents:</strong></p>
+            <ul>
+              <li>call_agent_id: ${agentConfig.call_agent_id || '<span class="null">null</span>'}</li>
+              <li>sms_agent_id: ${agentConfig.sms_agent_id || '<span class="null">null</span>'}</li>
+            </ul>
+          `;
+        }
+
+        analysis += '<p><strong>Full Record:</strong></p>' + formatJSON(data);
+
+        addResult('2️⃣ user_settings Table', analysis,
+          (hasRetellConfig || hasRetellAgentConfig) ? 'result success' : 'result warning');
+        return { success: true, data, hasRetellConfig, hasRetellAgentConfig };
+
+      } catch (error) {
+        console.error('Error checking user_settings:', error);
+        addResult('2️⃣ user_settings Table',
+          `<p class="error">❌ Error: ${error.message}</p>` + formatJSON(error),
+          'result error');
+        return { success: false, error: error.message };
+      }
+    }
+
+    async function checkLocalStorage(userId) {
+      try {
+        console.log('🔍 Checking localStorage...');
+
+        const storageKey = `apikeys_${userId}`;
+        const storedData = localStorage.getItem(storageKey);
+
+        if (!storedData) {
+          addResult('3️⃣ localStorage',
+            `<p>❌ No data found for key: <code>${storageKey}</code></p>`,
+            'result warning');
+          return { success: true, data: null };
+        }
+
+        const parsed = JSON.parse(storedData);
+        const hasApiKey = !!parsed.encrypted_keys?.retell_api_key;
+        const hasCallAgent = !!parsed.encrypted_keys?.call_agent_id;
+        const hasSmsAgent = !!parsed.encrypted_keys?.sms_agent_id;
+
+        let analysis = `
+          <p><strong>Storage Key:</strong> <code>${storageKey}</code></p>
+          <p><strong>Data Found:</strong> ✅ YES</p>
+          <p><strong>encrypted_keys.retell_api_key:</strong> ${getBadge(hasApiKey)}</p>
+          <p><strong>encrypted_keys.call_agent_id:</strong> ${getBadge(hasCallAgent)}</p>
+          <p><strong>encrypted_keys.sms_agent_id:</strong> ${getBadge(hasSmsAgent)}</p>
+          <p><strong>Stored At:</strong> ${parsed.stored_at || '<span class="null">N/A</span>'}</p>
+          <p><strong>Storage Method:</strong> ${parsed.storage_method || '<span class="null">N/A</span>'}</p>
+        `;
+
+        analysis += '<p><strong>Full Data:</strong></p>' + formatJSON(parsed);
+
+        addResult('3️⃣ localStorage', analysis, 'result success');
+        return { success: true, data: parsed };
+
+      } catch (error) {
+        console.error('Error checking localStorage:', error);
+        addResult('3️⃣ localStorage',
+          `<p class="error">❌ Error: ${error.message}</p>` + formatJSON(error),
+          'result error');
+        return { success: false, error: error.message };
+      }
+    }
+
+    async function analyzeMismatch(profilesResult, settingsResult, localStorageResult) {
+      let issues = [];
+      let recommendations = [];
+
+      // Check if Agent IDs are stored anywhere
+      const agentIdsInProfiles = profilesResult.success && profilesResult.hasAgentConfig;
+      const agentIdsInSettings = settingsResult.success &&
+        (settingsResult.hasRetellConfig || settingsResult.hasRetellAgentConfig);
+      const agentIdsInLocalStorage = localStorageResult.success &&
+        localStorageResult.data?.encrypted_keys?.call_agent_id;
+
+      if (!agentIdsInProfiles && !agentIdsInSettings && !agentIdsInLocalStorage) {
+        issues.push('🚨 <strong>CRITICAL:</strong> Agent IDs are not stored in ANY location');
+        recommendations.push('Storage layer is failing to persist Agent IDs - check save logic');
+      }
+
+      if (agentIdsInLocalStorage && !agentIdsInProfiles && !agentIdsInSettings) {
+        issues.push('⚠️ Agent IDs only in localStorage (not persisted to database)');
+        recommendations.push('Database upsert is failing - check for 409 Conflict or schema cache errors');
+      }
+
+      // Check user_profiles upsert conflict
+      if (profilesResult.data && profilesResult.success) {
+        recommendations.push('✅ user_profiles record exists - upsert should use UPDATE not INSERT');
+        recommendations.push('Check if upsert operation has proper conflict resolution (.onConflict())');
+      }
+
+      // Check schema cache issue
+      if (settingsResult.error && settingsResult.error.includes('schema cache')) {
+        issues.push('🚨 <strong>SCHEMA CACHE ISSUE:</strong> Postgrest schema cache is outdated');
+        recommendations.push('Run: <code>NOTIFY pgrst, \'reload schema\';</code> in Supabase SQL Editor');
+        recommendations.push('Or use RPC function to bypass schema cache for writes');
+      }
+
+      // Storage/Retrieval mismatch analysis
+      let storageAnalysis = '<h3>Storage vs Retrieval Analysis:</h3><ul>';
+
+      if (agentIdsInProfiles) {
+        storageAnalysis += '<li>✅ Agent IDs in user_profiles.encrypted_agent_config</li>';
+        storageAnalysis += '<li>✅ Retrieval should use: retrieveFromUserProfiles()</li>';
+      }
+
+      if (agentIdsInSettings) {
+        storageAnalysis += '<li>✅ Agent IDs in user_settings (retell_config or retell_agent_config)</li>';
+        storageAnalysis += '<li>✅ Retrieval should use: retrievePartialFromUserProfiles() or retrieveFromUserSettings()</li>';
+      }
+
+      if (agentIdsInLocalStorage) {
+        storageAnalysis += '<li>⚠️ Agent IDs ONLY in localStorage (fallback)</li>';
+        storageAnalysis += '<li>⚠️ This means database writes failed</li>';
+      }
+
+      storageAnalysis += '</ul>';
+
+      let analysisHTML = '<div>';
+
+      if (issues.length > 0) {
+        analysisHTML += '<h3>Issues Found:</h3><ul>';
+        issues.forEach(issue => analysisHTML += `<li>${issue}</li>`);
+        analysisHTML += '</ul>';
+      } else {
+        analysisHTML += '<p>✅ No critical issues detected</p>';
+      }
+
+      if (recommendations.length > 0) {
+        analysisHTML += '<h3>Recommendations:</h3><ul>';
+        recommendations.forEach(rec => analysisHTML += `<li>${rec}</li>`);
+        analysisHTML += '</ul>';
+      }
+
+      analysisHTML += storageAnalysis;
+      analysisHTML += '</div>';
+
+      addResult('4️⃣ Root Cause Analysis', analysisHTML,
+        issues.length > 0 ? 'result error' : 'result success');
+    }
+
+    async function runDiagnostics() {
+      clearResults();
+
+      try {
+        initSupabase();
+        const config = getConfig();
+
+        addResult('Configuration', `
+          <p><strong>User ID:</strong> ${config.userId}</p>
+          <p><strong>Tenant ID:</strong> ${config.tenantId}</p>
+          <p><strong>Supabase URL:</strong> ${config.url}</p>
+        `, 'result');
+
+        // Run all checks
+        const profilesResult = await checkUserProfiles(config.userId, config.tenantId);
+        const settingsResult = await checkUserSettings(config.userId, config.tenantId);
+        const localStorageResult = await checkLocalStorage(config.userId);
+
+        // Analyze results
+        await analyzeMismatch(profilesResult, settingsResult, localStorageResult);
+
+        addResult('✅ Diagnostics Complete',
+          '<p>All checks completed. Review the results above for detailed analysis.</p>',
+          'result success');
+
+      } catch (error) {
+        addResult('Fatal Error',
+          `<p class="error">❌ ${error.message}</p>` + formatJSON(error),
+          'result error');
+      }
+    }
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+    }
+
+    // Auto-fill from localStorage if available
+    window.addEventListener('load', () => {
+      const savedUrl = localStorage.getItem('diagnostic_supabase_url');
+      const savedKey = localStorage.getItem('diagnostic_supabase_key');
+
+      if (savedUrl) document.getElementById('supabaseUrl').value = savedUrl;
+      if (savedKey) document.getElementById('supabaseKey').value = savedKey;
+
+      // Save config on change
+      document.getElementById('supabaseUrl').addEventListener('change', (e) => {
+        localStorage.setItem('diagnostic_supabase_url', e.target.value);
+      });
+      document.getElementById('supabaseKey').addEventListener('change', (e) => {
+        localStorage.setItem('diagnostic_supabase_key', e.target.value);
+      });
+    });
+  </script>
+</body>
+</html>

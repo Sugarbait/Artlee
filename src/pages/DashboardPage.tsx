@@ -7,7 +7,6 @@ import { pdfExportService } from '@/services/pdfExportService'
 import { userSettingsService } from '@/services'
 import { SiteHelpChatbot } from '@/components/common/SiteHelpChatbot'
 import { stripeInvoiceService } from '@/services/stripeInvoiceService'
-import { invoiceHistoryService } from '@/services/invoiceHistoryService'
 import { invoiceEmailService } from '@/services/invoiceEmailService'
 import { generalToast } from '@/services/generalToastService'
 import { supabase } from '@/config/supabase'
@@ -76,11 +75,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
   // Invoice generation state
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
-  const [invoiceCustomerName, setInvoiceCustomerName] = useState('')
-  const [invoiceCustomerEmail] = useState('elitesquadp@protonmail.com') // TESTING: Using test email until confirmed working
+  // ARTLEE: Hardcoded customer info for Artlee Creative
+  const [invoiceCustomerName] = useState('Artlee Creative')
+  const [invoiceCustomerEmail] = useState('create@artlee.agency')
 
   // Track shown errors to prevent duplicates
-  const shownErrors = React.useRef<Set<string>>(new Set())
+  // Track shown errors in localStorage to persist across page refreshes
+  const getShownErrors = (): Set<string> => {
+    try {
+      const stored = localStorage.getItem('dashboard_shown_errors')
+      return stored ? new Set(JSON.parse(stored)) : new Set()
+    } catch {
+      return new Set()
+    }
+  }
+
+  const saveShownErrors = (errors: Set<string>) => {
+    try {
+      localStorage.setItem('dashboard_shown_errors', JSON.stringify([...errors]))
+    } catch (error) {
+      console.error('Failed to save shown errors:', error)
+    }
+  }
+
+  const [shownErrorsState] = useState<Set<string>>(getShownErrors())
 
   // SMS Segment caching state (exact copy from SMS page)
   const [fullDataSegmentCache, setFullDataSegmentCache] = useState<Map<string, number>>(new Map())
@@ -248,22 +266,54 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
     console.log(`📁 Dashboard loaded ${cachedSegments.size} cached segments from localStorage`)
   }, [])
 
-  // Load credentials and fetch initial data on mount
+  // Initialize Stripe and force-load credentials on mount
   useEffect(() => {
-    console.log('🚀 Dashboard: Initial mount - loading credentials and data')
+    console.log('🚀 Dashboard: Initial mount - initializing Stripe and credentials')
 
-    // Initialize Stripe service
-    const initStripe = async () => {
-      const result = await stripeInvoiceService.initialize()
-      if (result.success) {
-        console.log('✅ Stripe invoice service initialized')
-      } else {
-        console.warn('⚠️ Stripe invoice service initialization failed:', result.error)
+    const initAll = async () => {
+      // First, force-load credentials from localStorage
+      try {
+        console.log('🔧 Dashboard: Force-loading credentials from localStorage...')
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+        if (currentUser.id) {
+          const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
+
+          const storedApiKeys = {
+            retellApiKey: settings.retellApiKey || '',
+            callAgentId: settings.callAgentId || '',
+            smsAgentId: settings.smsAgentId || ''
+          }
+
+          // Update retell service if keys exist
+          if (storedApiKeys.retellApiKey) {
+            retellService.updateCredentials(
+              storedApiKeys.retellApiKey,
+              storedApiKeys.callAgentId,
+              storedApiKeys.smsAgentId
+            )
+            console.log('✅ Dashboard: Credentials force-loaded into retellService')
+          } else {
+            console.log('ℹ️ Dashboard: No credentials found in localStorage')
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Dashboard: Error force-loading credentials:', error)
+      }
+
+      // Then initialize Stripe
+      try {
+        const result = await stripeInvoiceService.initialize()
+        if (result.success) {
+          console.log('✅ Stripe invoice service initialized')
+        } else {
+          console.warn('⚠️ Stripe invoice service initialization failed:', result.error)
+        }
+      } catch (error) {
+        console.warn('⚠️ Stripe initialization error:', error)
       }
     }
 
-    initStripe()
-    fetchDashboardData()
+    initAll()
   }, []) // Empty dependency array = run once on mount
 
   // Save cache when it changes
@@ -852,9 +902,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
 
       if (!hasApiKey) {
         console.log('🔄 No API key found on first check, forcing credential reload...')
-        retellService.loadCredentials()
+        await retellService.loadCredentialsAsync()
+        await chatService.syncWithRetellService()
         apiKey = retellService.getApiKey()
         hasApiKey = !!apiKey
+        console.log('✅ Fallback credential loading completed, hasApiKey:', hasApiKey)
       }
 
       if (!hasApiKey) {
@@ -1038,11 +1090,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
       console.error('Failed to fetch dashboard data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard data'
 
-      // Only show the error if we haven't shown it before
-      if (!shownErrors.current.has(errorMessage)) {
+      // Only show the error if we haven't shown it before in this browser session
+      if (!shownErrorsState.has(errorMessage)) {
         setError(errorMessage)
-        shownErrors.current.add(errorMessage)
+        shownErrorsState.add(errorMessage)
+        saveShownErrors(shownErrorsState)
       }
+
+      // Set default metrics so UI still displays with zeros
+      setMetrics({
+        totalCalls: 0,
+        totalCost: 0,
+        avgCostPerCall: 0,
+        avgDuration: '0:00',
+        successRate: 0,
+        totalChats: 0,
+        totalSMSCost: 0,
+        avgCostPerMessage: 0,
+        highestCostCall: 0,
+        lowestCostCall: 0,
+        totalSMSSegments: 0,
+        avgMessagesPerChat: 0
+      })
+
       setRetellStatus('error')
     } finally {
       setIsLoading(false)
@@ -1119,6 +1189,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
       const { start, end } = getDateRangeFromSelection(selectedDateRange, customStartDate, customEndDate)
 
       // Use pre-calculated metrics from Dashboard
+      console.log('📊 Dashboard metrics before invoice:', {
+        totalCalls: metrics.totalCalls,
+        totalCost: metrics.totalCost,
+        totalMessages: metrics.totalMessages,
+        totalSegments: metrics.totalSegments,
+        totalSMSCost: metrics.totalSMSCost
+      })
+
       // Use appropriate customer name based on email
       const customerDescription = invoiceCustomerEmail.trim() === 'create@artlee.agency'
         ? 'Artlee Agency Customer'
@@ -1141,27 +1219,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
           totalChats: metrics.totalMessages || 0,
           totalSegments: metrics.totalSegments || 0,
           smsCostCAD: (metrics.totalSMSCost || 0) * 1.45  // Convert USD to CAD
-        }
+        },
+        sendImmediately: true,  // Finalize and send the invoice
+        autoFinalize: true      // Auto-finalize the invoice
       })
 
       if (result.success && result.invoiceId) {
         // Save to local history
-        await invoiceHistoryService.createInvoice({
-          invoiceId: result.invoiceId,
-          customerEmail: invoiceCustomerEmail.trim(),
-          customerName: invoiceCustomerName.trim(),
-          periodStart: start,
-          periodEnd: end,
-          callCount: metrics.totalCalls || 0,
-          callCostCad: (metrics.totalCost || 0) * 1.45,  // Convert USD to CAD
-          smsCount: metrics.totalMessages || 0,
-          smsSegments: metrics.totalSegments || 0,
-          smsCostCad: (metrics.totalSMSCost || 0) * 1.45,  // Convert USD to CAD
-          totalCostCad: ((metrics.totalCost || 0) + (metrics.totalSMSCost || 0)) * 1.45,  // Convert USD to CAD
-          invoiceUrl: result.invoiceUrl,
-          invoiceStatus: 'draft',
-          generatedAutomatically: false
-        })
+        // TODO: Implement invoiceHistoryService for local invoice tracking
+        // await invoiceHistoryService.createInvoice({
+        //   invoiceId: result.invoiceId,
+        //   customerEmail: invoiceCustomerEmail.trim(),
+        //   customerName: invoiceCustomerName.trim(),
+        //   periodStart: start,
+        //   periodEnd: end,
+        //   callCount: metrics.totalCalls || 0,
+        //   callCostCad: (metrics.totalCost || 0) * 1.45,  // Convert USD to CAD
+        //   smsCount: metrics.totalMessages || 0,
+        //   smsSegments: metrics.totalSegments || 0,
+        //   smsCostCad: (metrics.totalSMSCost || 0) * 1.45,  // Convert USD to CAD
+        //   totalCostCad: ((metrics.totalCost || 0) + (metrics.totalSMSCost || 0)) * 1.45,  // Convert USD to CAD
+        //   invoiceUrl: result.invoiceUrl,
+        //   invoiceStatus: 'draft',
+        //   generatedAutomatically: false
+        // })
 
         // Upload PDF report to Supabase Storage and get download link
         console.log('📤 Uploading PDF report to Supabase Storage...')
@@ -1201,8 +1282,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
 
         // Send invoice email
         console.log('📧 Sending invoice email...')
+        console.log('🔗 Invoice URL from Stripe:', result.invoiceUrl)
         console.log('📄 PDF Download Link:', pdfDownloadLink)
-        const emailResult = await invoiceEmailService.sendInvoiceEmail({
+
+        const emailData = {
           to_email: invoiceCustomerEmail.trim(),
           to_name: invoiceCustomerName.trim(),
           invoice_id: result.invoiceId,
@@ -1215,7 +1298,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
           invoice_url: result.invoiceUrl || '',
           pdf_download_link: pdfDownloadLink,
           pdf_expiry_days: 30
-        })
+        }
+
+        console.log('📧 Email data being sent:', emailData)
+        const emailResult = await invoiceEmailService.sendInvoiceEmail(emailData)
 
         // Clear form and close modal
         setInvoiceCustomerName('')
@@ -1230,7 +1316,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
           )
         } else {
           generalToast.warning(
-            `Invoice generated successfully (ID: ${result.invoiceId}) but email failed to send. Error: ${emailResult.error || 'Unknown error'}`,
+            `Invoice generated successfully (ID: ${result.invoiceId}) but email failed to send. ${emailResult.error || 'Email service not configured.'}`,
             'Email Failed',
             8000
           )
@@ -1332,7 +1418,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
           <span className="text-red-700">{error}</span>
           <button
             onClick={() => {
-              shownErrors.current.delete(error)
+              shownErrorsState.delete(error)
+              saveShownErrors(shownErrorsState)
               setError('')
             }}
             className="ml-auto text-red-600 hover:text-red-800 text-xl"
@@ -1710,14 +1797,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Customer Name *
                 </label>
-                <input
-                  type="text"
-                  value={invoiceCustomerName}
-                  onChange={(e) => setInvoiceCustomerName(e.target.value)}
-                  disabled={isGeneratingInvoice}
-                  placeholder="Enter customer name"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100 disabled:opacity-50"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={invoiceCustomerName}
+                    disabled
+                    readOnly
+                    className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 cursor-not-allowed"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <LockIcon className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
               </div>
 
               <div>

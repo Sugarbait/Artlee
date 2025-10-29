@@ -1,13 +1,13 @@
 /**
  * Tenant Configuration for Multi-Tenant Isolation
  *
- * Phaeton AI CRM uses tenant-based data isolation to separate data from other tenants.
+ * ARTLEE CRM uses tenant-based data isolation to separate data from other tenants.
  * All database queries automatically filter by tenant_id.
  */
 
 export const TENANT_CONFIG = {
   // Current tenant for this application
-  CURRENT_TENANT: 'phaeton_ai' as const,
+  CURRENT_TENANT: 'artlee' as const,
 
   // All available tenants
   TENANTS: {

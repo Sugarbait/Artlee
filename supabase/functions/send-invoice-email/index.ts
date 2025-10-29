@@ -180,7 +180,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             width: 100%;
             padding: 16px 24px;
             text-align: center;
-            text-decoration: none;
+            text-decoration: none !important;
             font-weight: 600;
             font-size: 15px;
             transition: all 0.2s ease;
@@ -188,6 +188,10 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             border: 2px solid transparent;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            cursor: pointer;
+            pointer-events: auto;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .btn-primary {
@@ -349,12 +353,36 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             </div>
 
             <div class="action-section">
-                <a href="{{invoice_url}}" class="button btn-primary">Pay Invoice in Stripe</a>
-                <a href="{{pdf_download_link}}" class="button btn-secondary">Download PDF Details</a>
+                <!-- Primary Button: Pay Invoice -->
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 12px;">
+                    <tr>
+                        <td align="center" style="border-radius: 4px;" bgcolor="#1e3a5f">
+                            <a href="{{invoice_url}}" target="_blank" style="font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 4px; padding: 16px 24px; border: 2px solid #1e3a5f; display: inline-block; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+                                Pay Invoice in Stripe
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Secondary Button: Download PDF -->
+                <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                        <td align="center" style="border-radius: 4px; border: 2px solid #cbd5e0;" bgcolor="#ffffff">
+                            <a href="{{pdf_download_link}}" target="_blank" style="font-size: 15px; font-weight: 600; color: #1e3a5f; text-decoration: none; border-radius: 4px; padding: 16px 24px; display: inline-block; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;">
+                                Download PDF Details
+                            </a>
+                        </td>
+                    </tr>
+                </table>
             </div>
 
             <div class="info-box">
                 <strong>Important:</strong> The PDF download link will expire in {{pdf_expiry_days}} days. Please save a copy for your records.
+            </div>
+
+            <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px; font-size: 13px; color: #4a5568; text-align: center;">
+                <strong>Having trouble with the button?</strong><br>
+                Copy and paste this link into your browser: <a href="{{invoice_url}}" style="color: #1e3a5f; word-break: break-all;">{{invoice_url}}</a>
             </div>
 
             <div class="closing">
@@ -404,6 +432,8 @@ serve(async (req) => {
     } = requestBody
 
     console.log('📧 Sending invoice email to:', to_email)
+    console.log('🔗 Invoice URL:', invoice_url)
+    console.log('📄 PDF Download Link:', pdf_download_link)
 
     // Validate required fields
     if (!to_email) {
@@ -414,6 +444,9 @@ serve(async (req) => {
     }
     if (!invoice_id) {
       throw new Error('Missing required field: invoice_id')
+    }
+    if (!invoice_url || invoice_url === '' || invoice_url === 'undefined') {
+      console.warn('⚠️ Warning: invoice_url is empty or undefined')
     }
 
     // Replace template placeholders
@@ -434,7 +467,7 @@ serve(async (req) => {
     const data = await resend.emails.send({
       from: 'ARTLEE CRM <aibot@phaetonai.com>',
       to: [to_email],
-      subject: `Invoice ${invoice_id} - ${total_amount}`,
+      subject: `Your Phaeton AI Service Cost Invoice - ${date_range} - ${total_amount}`,
       html: emailHtml,
     })
 

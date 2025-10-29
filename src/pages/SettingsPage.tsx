@@ -41,7 +41,7 @@ import { toastNotificationService, ToastNotificationPreferences } from '@/servic
 import { logoService, CompanyLogos } from '@/services/logoService'
 import { EmailNotificationSettings } from '@/components/settings/EmailNotificationSettings'
 import { generalToast } from '@/services/generalToastService'
-import InvoiceHistorySettings from '@/components/settings/InvoiceHistorySettings'
+import { InvoiceHistorySettings } from '@/components/settings/InvoiceHistorySettings'
 // Removed old TOTP hook - using fresh MFA service directly
 
 interface User {

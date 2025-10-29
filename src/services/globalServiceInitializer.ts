@@ -36,8 +36,8 @@ export class GlobalServiceInitializer {
     try {
       console.log('🔧 GLOBAL: Starting service initialization...')
 
-      // Phaeton AI CRM: No hardcoded credentials - load from user configuration
-      console.log('🔧 GLOBAL: Phaeton AI - Loading user-configured credentials...')
+      // ARTLEE CRM: No hardcoded credentials - load from user configuration
+      console.log('🔧 GLOBAL: ARTLEE - Loading user-configured credentials...')
 
       // Don't initialize with hardcoded credentials - load from storage instead
 

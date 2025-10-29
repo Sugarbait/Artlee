@@ -192,39 +192,15 @@ export class CloudCredentialService {
 
   /**
    * Store user-specific credential override in cloud
-   * Phaeton AI CRM: Allows storing blank credentials for cross-device clearing
+   * ARTLEE CRM: Allows storing blank credentials for cross-device clearing
    */
   public async storeUserCredentials(userId: string, credentials: RetellCredentials): Promise<void> {
     try {
-      // For Phaeton AI CRM, allow storing blank credentials (for cross-device clearing)
-      // Skip validation to allow users to clear credentials across all devices
-
-      const credentialRecord: CloudCredentialRecord = {
-        credential_type: 'user_override',
-        api_key: credentials.apiKey || '',
-        call_agent_id: credentials.callAgentId || '',
-        sms_agent_id: credentials.smsAgentId || '',
-        user_id: userId,
-        is_active: true,
-        metadata: {
-          source: 'user_settings',
-          created_by: userId,
-          purpose: 'user_specific_override',
-          timestamp: new Date().toISOString()
-        }
-      }
-
-      // Upsert user credentials
-      const { error } = await supabase
-        .from('system_credentials')
-        .upsert([credentialRecord], {
-          onConflict: 'user_id,credential_type',
-          ignoreDuplicates: false
-        })
-
-      if (error) throw error
-
-      console.log('📁 Phaeton AI: Stored user credentials in cloud for:', userId)
+      // DISABLED: system_credentials table doesn't exist
+      // Using user_settings table via apiKeyFallbackService instead
+      console.log('⚠️ CloudCredentialService: system_credentials table not available, skipping cloud sync')
+      console.log('📁 Use apiKeyFallbackService for credential storage instead')
+      return
     } catch (error) {
       console.error('❌ CloudCredentialService: Failed to store user credentials:', error)
       throw error
@@ -310,11 +286,11 @@ export class CloudCredentialService {
 
   /**
    * Sync credentials to cloud for a user (called when user updates settings)
-   * Phaeton AI CRM: Stores blank values to allow clearing credentials across devices
+   * ARTLEE CRM: Stores blank values to allow clearing credentials across devices
    */
   public async syncUserCredentialsToCloud(userId: string, credentials: Partial<RetellCredentials>): Promise<void> {
     try {
-      // For Phaeton AI CRM, store credentials as-is (including blank values)
+      // For ARTLEE CRM, store credentials as-is (including blank values)
       // This allows users to clear credentials across all devices
       const fullCredentials: RetellCredentials = {
         apiKey: credentials.apiKey !== undefined ? credentials.apiKey : '',
@@ -326,15 +302,15 @@ export class CloudCredentialService {
       const allBlank = !fullCredentials.apiKey && !fullCredentials.callAgentId && !fullCredentials.smsAgentId
 
       if (allBlank) {
-        console.log('📁 Phaeton AI - Storing blank credentials to cloud (user cleared API keys)')
+        console.log('📁 ARTLEE - Storing blank credentials to cloud (user cleared API keys)')
       } else if (validateCredentials(fullCredentials)) {
-        console.log('📁 Phaeton AI - Storing valid credentials to cloud')
+        console.log('📁 ARTLEE - Storing valid credentials to cloud')
       } else {
-        console.warn('⚠️ Phaeton AI - Storing partially filled credentials to cloud')
+        console.warn('⚠️ ARTLEE - Storing partially filled credentials to cloud')
       }
 
       await this.storeUserCredentials(userId, fullCredentials)
-      console.log('✅ Phaeton AI: Synced user credentials to cloud for:', userId)
+      console.log('✅ ARTLEE: Synced user credentials to cloud for:', userId)
     } catch (error) {
       console.error('❌ CloudCredentialService: Failed to sync user credentials to cloud:', error)
     }

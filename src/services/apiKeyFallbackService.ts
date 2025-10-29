@@ -186,6 +186,8 @@ export class ApiKeyFallbackService {
           encrypted_retell_api_key: encryptedKeys.retell_api_key,
           encrypted_agent_config: agentConfig,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         })
 
       if (error) throw error
@@ -215,6 +217,8 @@ export class ApiKeyFallbackService {
             user_id: userId,
             encrypted_retell_api_key: encryptedKeys.retell_api_key,
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
           })
 
         if (profileError) throw profileError
@@ -225,10 +229,13 @@ export class ApiKeyFallbackService {
         .from('user_settings')
         .upsert({
           user_id: userId,
+          tenant_id: getCurrentTenantId(),
           retell_agent_config: agentConfig,
           encrypted_retell_keys: encryptedKeys,
           api_key_updated_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         })
 
       if (settingsError) throw settingsError
@@ -260,10 +267,13 @@ export class ApiKeyFallbackService {
         .from('user_settings')
         .upsert({
           user_id: userId,
+          tenant_id: getCurrentTenantId(),
           retell_config: retellConfig,
           encrypted_api_keys: encryptedKeys,
           api_key_updated_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         })
 
       if (error) throw error
@@ -378,6 +388,7 @@ export class ApiKeyFallbackService {
         .from('user_profiles')
         .select('encrypted_retell_api_key, encrypted_agent_config')
         .eq('user_id', userId)
+        .eq('tenant_id', getCurrentTenantId())
         .single()
 
       if (error) throw error
@@ -391,6 +402,26 @@ export class ApiKeyFallbackService {
       const agentConfig = data.encrypted_agent_config || {}
       if (agentConfig.call_agent_id) apiKeys.call_agent_id = agentConfig.call_agent_id
       if (agentConfig.sms_agent_id) apiKeys.sms_agent_id = agentConfig.sms_agent_id
+
+      // Fallback: If Agent IDs are missing from database, check localStorage
+      if (!apiKeys.call_agent_id || !apiKeys.sms_agent_id) {
+        try {
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+          if (currentUser.id) {
+            const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
+            if (!apiKeys.call_agent_id && settings.callAgentId) {
+              apiKeys.call_agent_id = settings.callAgentId
+              console.log('📦 ApiKeyFallbackService: Loaded Call Agent ID from localStorage fallback')
+            }
+            if (!apiKeys.sms_agent_id && settings.smsAgentId) {
+              apiKeys.sms_agent_id = settings.smsAgentId
+              console.log('📦 ApiKeyFallbackService: Loaded SMS Agent ID from localStorage fallback')
+            }
+          }
+        } catch (localStorageError) {
+          console.warn('ApiKeyFallbackService: localStorage fallback failed:', localStorageError)
+        }
+      }
 
       return { status: 'success', data: apiKeys }
     } catch (error: any) {
@@ -411,6 +442,7 @@ export class ApiKeyFallbackService {
         .from('user_profiles')
         .select('encrypted_retell_api_key')
         .eq('user_id', userId)
+        .eq('tenant_id', getCurrentTenantId())
         .single()
 
       if (!profileError && profileData?.encrypted_retell_api_key) {
@@ -422,6 +454,7 @@ export class ApiKeyFallbackService {
         .from('user_settings')
         .select('retell_agent_config')
         .eq('user_id', userId)
+        .eq('tenant_id', getCurrentTenantId())
         .single()
 
       if (!settingsError && settingsData?.retell_agent_config) {
@@ -446,6 +479,7 @@ export class ApiKeyFallbackService {
         .from('user_settings')
         .select('retell_config, encrypted_api_keys')
         .eq('user_id', userId)
+        .eq('tenant_id', getCurrentTenantId())
         .single()
 
       if (error) throw error
@@ -455,6 +489,26 @@ export class ApiKeyFallbackService {
         retell_api_key: retellConfig.api_key,
         call_agent_id: retellConfig.call_agent_id,
         sms_agent_id: retellConfig.sms_agent_id,
+      }
+
+      // Fallback: If Agent IDs are missing from database, check localStorage
+      if (!apiKeys.call_agent_id || !apiKeys.sms_agent_id) {
+        try {
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+          if (currentUser.id) {
+            const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
+            if (!apiKeys.call_agent_id && settings.callAgentId) {
+              apiKeys.call_agent_id = settings.callAgentId
+              console.log('📦 ApiKeyFallbackService: Loaded Call Agent ID from localStorage fallback (user_settings)')
+            }
+            if (!apiKeys.sms_agent_id && settings.smsAgentId) {
+              apiKeys.sms_agent_id = settings.smsAgentId
+              console.log('📦 ApiKeyFallbackService: Loaded SMS Agent ID from localStorage fallback (user_settings)')
+            }
+          }
+        } catch (localStorageError) {
+          console.warn('ApiKeyFallbackService: localStorage fallback failed:', localStorageError)
+        }
       }
 
       return { status: 'success', data: apiKeys }

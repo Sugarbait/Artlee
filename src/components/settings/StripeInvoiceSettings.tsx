@@ -23,9 +23,9 @@ export const StripeInvoiceSettings: React.FC<StripeInvoiceSettingsProps> = ({ us
   const [isInitialized, setIsInitialized] = useState(false)
   const [initError, setInitError] = useState('')
 
-  // Customer info
-  const [customerEmail, setCustomerEmail] = useState('')
-  const [customerName, setCustomerName] = useState('')
+  // Customer info - ARTLEE: Hardcoded to always use Artlee Creative
+  const [customerEmail] = useState('create@artlee.agency')
+  const [customerName] = useState('Artlee Creative')
 
   // Auto-invoice settings
   const [autoInvoiceEnabled, setAutoInvoiceEnabled] = useState(false)
@@ -66,24 +66,13 @@ export const StripeInvoiceSettings: React.FC<StripeInvoiceSettingsProps> = ({ us
             if (supabaseSettings?.stripe_auto_invoice_enabled !== undefined) {
               setAutoInvoiceEnabled(supabaseSettings.stripe_auto_invoice_enabled)
             }
-            if (supabaseSettings?.stripe_customer_email) {
-              setCustomerEmail(supabaseSettings.stripe_customer_email)
-            }
-            if (supabaseSettings?.stripe_customer_name) {
-              setCustomerName(supabaseSettings.stripe_customer_name)
-            }
+            // ARTLEE: Customer email and name are hardcoded - don't load from settings
           } catch (supabaseError) {
             console.log('Supabase not available, using localStorage fallback')
           }
         }
 
-        // Set default customer email from user if not already set
-        if (!customerEmail && user?.email) {
-          setCustomerEmail(user.email)
-        }
-        if (!customerName && (user?.name || user?.username)) {
-          setCustomerName(user.name || user.username)
-        }
+        // ARTLEE: Customer email and name are hardcoded to Artlee Creative - don't set from user
       } catch (error) {
         console.error('Failed to load Stripe settings:', error)
       }
@@ -344,9 +333,8 @@ export const StripeInvoiceSettings: React.FC<StripeInvoiceSettingsProps> = ({ us
             <input
               type="email"
               value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder="customer@example.com"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 cursor-not-allowed"
             />
           </div>
 
@@ -357,9 +345,8 @@ export const StripeInvoiceSettings: React.FC<StripeInvoiceSettingsProps> = ({ us
             <input
               type="text"
               value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="John Doe"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 cursor-not-allowed"
             />
           </div>
         </div>
