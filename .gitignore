@@ -42,3 +42,6 @@ Thumbs.db
 # Local
 .claude/settings.local.json
 Git-Final/
+
+# Nested repositories
+Phaeton AI Dashboard/

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARTLEE CRM - Automated Schema Setup</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 800px;
+      width: 100%;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #667eea;
+      font-size: 32px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 18px;
+    }
+
+    .step {
+      background: #f8f9ff;
+      border-left: 4px solid #667eea;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+    }
+
+    .step-number {
+      display: inline-block;
+      background: #667eea;
+      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 30px;
+      margin-right: 10px;
+      font-weight: bold;
+    }
+
+    .step-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .step-description {
+      color: #666;
+      line-height: 1.6;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 15px;
+      margin-top: 30px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      flex: 1;
+      min-width: 200px;
+      padding: 15px 30px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #f1f3f5;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e9ecef;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #51cf66 0%, #37b24d 100%);
+      color: white;
+    }
+
+    .btn-success:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(81, 207, 102, 0.4);
+    }
+
+    .status {
+      text-align: center;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      display: none;
+    }
+
+    .status.success {
+      background: #d3f9d8;
+      color: #2b8a3e;
+      border: 2px solid #51cf66;
+    }
+
+    .status.error {
+      background: #ffe3e3;
+      color: #c92a2a;
+      border: 2px solid #ff6b6b;
+    }
+
+    .status.info {
+      background: #d0ebff;
+      color: #1864ab;
+      border: 2px solid #4dabf7;
+    }
+
+    .icon {
+      font-size: 24px;
+    }
+
+    .code-box {
+      background: #2d3748;
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin: 15px 0;
+      display: none;
+    }
+
+    .code-box.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 ARTLEE CRM Schema Setup</h1>
+    <p class="subtitle">Automated Migration Assistant</p>
+
+    <div class="step">
+      <div class="step-title">
+        <span class="step-number">1</span>
+        Copy SQL to Clipboard
+      </div>
+      <div class="step-description">
+        Click the button below to automatically copy the schema SQL to your clipboard.
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title">
+        <span class="step-number">2</span>
+        Open Supabase SQL Editor
+      </div>
+      <div class="step-description">
+        The Supabase SQL Editor will open in a new tab automatically.
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title">
+        <span class="step-number">3</span>
+        Paste and Run
+      </div>
+      <div class="step-description">
+        In the SQL Editor, press Ctrl+V (or Cmd+V on Mac) to paste, then click the "Run" button.
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-title">
+        <span class="step-number">4</span>
+        Run Data Migration
+      </div>
+      <div class="step-description">
+        Once the SQL succeeds, click "Complete Migration" below to automatically transfer all data.
+      </div>
+    </div>
+
+    <div class="button-group">
+      <button class="btn-primary" onclick="copySQLAndOpenDashboard()">
+        <span class="icon">📋</span>
+        Copy SQL & Open Dashboard
+      </button>
+      <button class="btn-success" onclick="runDataMigration()">
+        <span class="icon">🚀</span>
+        Complete Migration
+      </button>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div id="codeBox" class="code-box"></div>
+  </div>
+
+  <script>
+    const SQL_FILE_PATH = 'I:\\Apps Back Up\\ARTLEE CRM\\migration\\01_artlee_schema_creation.sql';
+    const SUPABASE_URL = 'https://fslniuhyunzlfcbxsiol.supabase.co';
+
+    function showStatus(message, type) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = message;
+      statusDiv.className = `status ${type}`;
+      statusDiv.style.display = 'block';
+
+      if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    async function copySQLAndOpenDashboard() {
+      try {
+        showStatus('Reading SQL file...', 'info');
+
+        // Read SQL file
+        const response = await fetch('./01_artlee_schema_creation.sql');
+        if (!response.ok) {
+          throw new Error('Failed to load SQL file');
+        }
+
+        const sql = await response.text();
+
+        // Copy to clipboard
+        await navigator.clipboard.writeText(sql);
+
+        showStatus('✅ SQL copied to clipboard! Opening Supabase dashboard...', 'success');
+
+        // Open Supabase SQL Editor
+        setTimeout(() => {
+          window.open(`${SUPABASE_URL}/project/_/sql/new`, '_blank');
+        }, 1000);
+
+      } catch (error) {
+        showStatus(`❌ Error: ${error.message}. Please manually copy the SQL file.`, 'error');
+        console.error('Error:', error);
+      }
+    }
+
+    async function runDataMigration() {
+      showStatus('Starting data migration...', 'info');
+
+      try {
+        // Execute Node.js migration script
+        const response = await fetch('http://localhost:3000/api/migrate', {
+          method: 'POST'
+        });
+
+        if (response.ok) {
+          showStatus('✅ Migration completed successfully!', 'success');
+        } else {
+          throw new Error('Migration failed');
+        }
+
+      } catch (error) {
+        showStatus('⚠️ Please run: node migration/ULTRA_AUTO_MIGRATION.mjs', 'info');
+
+        // Show command to copy
+        const codeBox = document.getElementById('codeBox');
+        codeBox.textContent = 'cd "I:\\Apps Back Up\\ARTLEE CRM"\nnode migration/ULTRA_AUTO_MIGRATION.mjs';
+        codeBox.classList.add('show');
+      }
+    }
+
+    // Auto-load and show SQL preview
+    window.addEventListener('load', async () => {
+      try {
+        const response = await fetch('./01_artlee_schema_creation.sql');
+        if (response.ok) {
+          const sql = await response.text();
+          console.log('SQL file loaded successfully');
+        }
+      } catch (error) {
+        console.warn('Could not load SQL file:', error);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -90,7 +90,7 @@ class FreshMfaService {
 
       // Create TOTP instance
       const totp = new OTPAuth.TOTP({
-        issuer: 'ARTLEE CRM',
+        issuer: 'Phaeton AI CRM',
         label: userEmail,
         secret: secret,
         algorithm: 'SHA1',

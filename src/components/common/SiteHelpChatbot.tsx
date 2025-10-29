@@ -53,7 +53,7 @@ export const SiteHelpChatbot: React.FC<SiteHelpChatbotProps> = ({
     {
       id: '1',
       type: 'bot',
-      content: 'Hello! I\'m your ARTLEE Assistant. I can help you navigate the platform and answer questions about using the system. How can I help you today?',
+      content: 'Hello! I\'m your Phaeton AI Assistant. I can help you navigate the platform and answer questions about using the system. How can I help you today?',
       timestamp: new Date()
     }
   ])
@@ -126,7 +126,7 @@ export const SiteHelpChatbot: React.FC<SiteHelpChatbotProps> = ({
       {
         id: '1',
         type: 'bot',
-        content: 'Chat cleared! I\'m your ARTLEE Assistant. How can I help you today?',
+        content: 'Chat cleared! I\'m your Phaeton AI Assistant. How can I help you today?',
         timestamp: new Date()
       }
     ])
@@ -158,7 +158,7 @@ export const SiteHelpChatbot: React.FC<SiteHelpChatbotProps> = ({
             <span className="text-white text-xs font-bold">AI</span>
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 text-sm">ARTLEE Assistant</h3>
+            <h3 className="font-semibold text-gray-900 text-sm">Phaeton AI Assistant</h3>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -235,7 +235,7 @@ export const SiteHelpChatbot: React.FC<SiteHelpChatbotProps> = ({
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask me anything about ARTLEE..."
+                placeholder="Ask me anything about Phaeton AI..."
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 disabled={isTyping}
               />

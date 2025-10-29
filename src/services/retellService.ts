@@ -197,49 +197,45 @@ class RetellService {
    */
   private async loadCredentialsInternal(): Promise<void> {
     try {
-      console.log('🔄 RetellService - Loading credentials with bulletproof persistence...')
+      console.log('🔄 Phaeton AI: Loading user-configured credentials...')
 
-      // PRIORITY 1: ALWAYS use hardcoded credentials for ARTLEE
-      console.log('🔐 RetellService - Using hardcoded ARTLEE credentials (Priority 1)...')
-      let credentials = this.loadHardcodedCredentials()
+      // PRIORITY 1: Load from currentUser localStorage (user-configured keys)
+      let credentials = this.loadFromCurrentUser()
 
-      // Only check other sources if hardcoded credentials are somehow invalid
+      // PRIORITY 2: Scan all user settings if not found in currentUser
       if (!credentials.apiKey) {
-        console.warn('⚠️ Hardcoded credentials not available, checking fallbacks...')
+        credentials = this.scanAllUserSettings()
+      }
 
-        credentials = this.loadFromCurrentUser()
+      // PRIORITY 3: Load from sessionStorage backup
+      if (!credentials.apiKey) {
+        credentials = this.loadFromSessionStorage()
+      }
 
-        if (!credentials.apiKey) {
-          credentials = this.scanAllUserSettings()
-        }
+      // PRIORITY 4: Load from memory backup
+      if (!credentials.apiKey) {
+        credentials = this.loadFromMemoryBackup()
+      }
 
-        if (!credentials.apiKey) {
-          credentials = this.loadFromSessionStorage()
-        }
-
-        if (!credentials.apiKey) {
-          credentials = this.loadFromMemoryBackup()
-        }
-
-        // CLOUD FALLBACK: Try cloud storage as last resort
-        if (!credentials.apiKey) {
-          try {
-            const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-            const cloudCreds = await cloudCredentialService.getCredentialsWithFallback(currentUser.id)
-            if (validateCredentials(cloudCreds)) {
-              console.log('☁️ RetellService - Found credentials in cloud storage')
-              credentials = {
-                apiKey: cloudCreds.apiKey,
-                callAgentId: cloudCreds.callAgentId,
-                smsAgentId: cloudCreds.smsAgentId
-              }
-              storeCredentialsEverywhere(cloudCreds)
+      // PRIORITY 5: Try cloud storage
+      if (!credentials.apiKey) {
+        try {
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+          const cloudCreds = await cloudCredentialService.getCredentialsWithFallback(currentUser.id)
+          if (validateCredentials(cloudCreds)) {
+            console.log('☁️ Phaeton AI - Found credentials in cloud storage')
+            credentials = {
+              apiKey: cloudCreds.apiKey,
+              callAgentId: cloudCreds.callAgentId,
+              smsAgentId: cloudCreds.smsAgentId
             }
-          } catch (cloudError) {
-            console.warn('⚠️ RetellService - Cloud credential loading failed:', cloudError)
           }
+        } catch (cloudError) {
+          console.warn('⚠️ Phaeton AI - Cloud credential loading failed:', cloudError)
         }
       }
+
+      // Note: No hardcoded fallback for Phaeton AI - user must configure via Settings
 
       // Apply loaded credentials
       this.apiKey = credentials.apiKey || this.apiKey
@@ -257,23 +253,15 @@ class RetellService {
 
       this.isInitialized = true
 
-      console.log('✅ RetellService - Credentials loaded successfully:', {
+      console.log('✅ Phaeton AI - Credentials loaded:', {
         hasApiKey: !!this.apiKey,
         apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 15) + '...' : 'none',
         callAgentId: this.callAgentId || 'not set',
         smsAgentId: this.smsAgentId || 'not set',
-        source: 'bulletproof_loading_with_hardcoded_fallback',
-        isHardcoded: credentials.apiKey === getBulletproofCredentials().apiKey
+        source: 'user_configuration'
       })
 
-      // If we successfully loaded credentials, ensure they're stored everywhere
-      if (this.apiKey && this.callAgentId && this.smsAgentId) {
-        storeCredentialsEverywhere({
-          apiKey: this.apiKey,
-          callAgentId: this.callAgentId,
-          smsAgentId: this.smsAgentId
-        })
-      }
+      // Don't force store credentials everywhere - let user manage via Settings
 
     } catch (error) {
       console.error('❌ RetellService - Error loading credentials:', error)
@@ -288,17 +276,18 @@ class RetellService {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
       if (currentUser.id) {
         const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
-        if (settings.retellApiKey) {
-          console.log('🎯 RetellService - Found credentials via currentUser')
+        // Check if retellApiKey property exists (even if blank)
+        if ('retellApiKey' in settings) {
+          console.log('🎯 Phaeton AI - Found credentials via currentUser')
           return {
-            apiKey: settings.retellApiKey,
+            apiKey: settings.retellApiKey || '',
             callAgentId: settings.callAgentId || '',
             smsAgentId: settings.smsAgentId || ''
           }
         }
       }
     } catch (error) {
-      console.warn('RetellService - Error loading from currentUser:', error)
+      console.warn('Phaeton AI - Error loading from currentUser:', error)
     }
     return {apiKey: '', callAgentId: '', smsAgentId: ''}
   }
@@ -397,34 +386,30 @@ class RetellService {
   }
 
   /**
-   * Create in-memory backup of credentials
+   * Create in-memory backup of credentials (including blank ones)
    */
   private createMemoryBackup(): void {
-    if (this.apiKey) {
-      (window as any).__retellCredentialsBackup = {
-        apiKey: this.apiKey,
-        callAgentId: this.callAgentId,
-        smsAgentId: this.smsAgentId,
-        timestamp: Date.now()
-      }
+    (window as any).__retellCredentialsBackup = {
+      apiKey: this.apiKey,
+      callAgentId: this.callAgentId,
+      smsAgentId: this.smsAgentId,
+      timestamp: Date.now()
     }
   }
 
   /**
-   * Save credentials to sessionStorage for reliability
+   * Save credentials to sessionStorage for reliability (including blank ones)
    */
   private saveToSessionStorage(): void {
-    if (this.apiKey) {
-      try {
-        sessionStorage.setItem('retell_credentials_backup', JSON.stringify({
-          apiKey: this.apiKey,
-          callAgentId: this.callAgentId,
-          smsAgentId: this.smsAgentId,
-          timestamp: Date.now()
-        }))
-      } catch (error) {
-        console.warn('RetellService - Error saving to sessionStorage:', error)
-      }
+    try {
+      sessionStorage.setItem('retell_credentials_backup', JSON.stringify({
+        apiKey: this.apiKey,
+        callAgentId: this.callAgentId,
+        smsAgentId: this.smsAgentId,
+        timestamp: Date.now()
+      }))
+    } catch (error) {
+      console.warn('Phaeton AI - Error saving to sessionStorage:', error)
     }
   }
 
@@ -810,12 +795,9 @@ class RetellService {
     } catch (error) {
       console.error('❌ Fresh RetellService - Force update failed:', error)
 
-      // Fallback to the original hardcoded values if getBulletproofCredentials fails
-      this.updateCredentials(
-        'key_c3f084f5ca67781070e188b47d7f',
-        'agent_447a1b9da540237693b0440df6',
-        'agent_643486efd4b5a0e9d7e094ab99'
-      )
+      // Phaeton AI CRM: No hardcoded fallback - user must configure credentials
+      console.log('⚠️ Phaeton AI: No hardcoded credentials available - user must configure via Settings')
+      this.updateCredentials('', '', '')
     }
   }
 
@@ -845,15 +827,10 @@ class RetellService {
   }
 
   /**
-   * Sync credentials to cloud storage
+   * Sync credentials to cloud storage (including blank values for cross-device persistence)
    */
   private async syncCredentialsToCloud(apiKey?: string, callAgentId?: string, smsAgentId?: string): Promise<void> {
     try {
-      // Only sync if we have valid credentials
-      if (!apiKey || !callAgentId || !smsAgentId) {
-        return
-      }
-
       // Get current user ID
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
       if (!currentUser.id) {
@@ -861,18 +838,17 @@ class RetellService {
         return
       }
 
-      const credentials: RetellCredentials = {
-        apiKey,
-        callAgentId,
-        smsAgentId
+      // Sync credentials even if blank (to clear them across devices)
+      const credentials: Partial<RetellCredentials> = {
+        apiKey: apiKey !== undefined ? apiKey : this.apiKey,
+        callAgentId: callAgentId !== undefined ? callAgentId : this.callAgentId,
+        smsAgentId: smsAgentId !== undefined ? smsAgentId : this.smsAgentId
       }
 
-      if (validateCredentials(credentials)) {
-        await cloudCredentialService.syncUserCredentialsToCloud(currentUser.id, credentials)
-        console.log('✅ RetellService - Credentials synced to cloud successfully')
-      }
+      await cloudCredentialService.syncUserCredentialsToCloud(currentUser.id, credentials)
+      console.log('✅ Phaeton AI - Credentials synced to cloud successfully (including blank values)')
     } catch (error) {
-      console.warn('⚠️ RetellService - Failed to sync credentials to cloud:', error)
+      console.warn('⚠️ Phaeton AI - Failed to sync credentials to cloud:', error)
     }
   }
 

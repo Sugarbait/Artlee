@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { QrCode, Shield, Copy, Check, AlertCircle, Key, CheckCircle } from 'lucide-react'
+import { Shield, Copy, Check, AlertCircle, Key, CheckCircle } from 'lucide-react'
 import FreshMfaService from '../../services/freshMfaService'
 
 interface FreshMfaSetupProps {
@@ -117,13 +117,6 @@ export const FreshMfaSetup: React.FC<FreshMfaSetupProps> = ({
     } catch (error) {
       console.error('Failed to copy to clipboard:', error)
     }
-  }
-
-  /**
-   * Format secret for display (add spaces every 4 characters)
-   */
-  const formatSecret = (secret: string) => {
-    return secret.replace(/(.{4})/g, '$1 ').trim()
   }
 
   if (step === 'generate') {
@@ -280,7 +273,8 @@ export const FreshMfaSetup: React.FC<FreshMfaSetupProps> = ({
             <img
               src={setupData.qrCodeUrl}
               alt="MFA QR Code"
-              className="w-48 h-48 bg-white p-2 rounded"
+              className="w-48 h-48 !bg-white p-4 rounded"
+              style={{ backgroundColor: '#ffffff' }}
             />
           )}
         </div>

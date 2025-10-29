@@ -1036,14 +1036,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               referrerPolicy="no-referrer"
             />
           )}
-          <p className="text-gray-600 text-sm">Business Platform CRM</p>
-          <p className="text-gray-500 text-xs">Secure Business Platform</p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-md mb-4">
           <div className="text-center mb-4">
             <h2 className="text-lg font-semibold text-gray-800 mb-1">Welcome Back</h2>
-            <p className="text-gray-600 text-sm">Sign in to your business account</p>
+            <p className="text-gray-600 text-sm">Sign in to your CRM account</p>
           </div>
 
           {error && (

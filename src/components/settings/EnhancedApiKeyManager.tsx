@@ -97,43 +97,39 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
   }, [user.id])
 
   const forceHardwiredCredentials = () => {
-    console.log('🔧 API KEY MANAGEMENT: Forcing hardwired ARTLEE credentials immediately')
+    console.log('🔧 API KEY MANAGEMENT: Loading stored credentials (Phaeton AI CRM)')
 
-    // Always use the hardwired ARTLEE credentials
-    const hardwiredApiKeys = {
-      retell_api_key: 'key_3660938283961c067186004a50e3',
-      call_agent_id: 'agent_ca2a01536c2e94d0ff4e50df70',
-      sms_agent_id: ''
-    }
-
-    // Set in component state immediately
-    setApiKeys(hardwiredApiKeys)
-    // Update original state to match loaded values
-    setOriginalApiKeys({ ...hardwiredApiKeys })
-
-    // Update retell service immediately
-    retellService.updateCredentials(
-      hardwiredApiKeys.retell_api_key,
-      hardwiredApiKeys.call_agent_id,
-      hardwiredApiKeys.sms_agent_id
-    )
-
-    // Force update localStorage for persistence
+    // Don't force any hardwired credentials - this is Phaeton AI CRM, not ARTLEE
+    // Just load what's in localStorage
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
       if (currentUser.id) {
         const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
-        settings.retellApiKey = hardwiredApiKeys.retell_api_key
-        settings.callAgentId = hardwiredApiKeys.call_agent_id
-        settings.smsAgentId = hardwiredApiKeys.sms_agent_id
-        localStorage.setItem(`settings_${currentUser.id}`, JSON.stringify(settings))
-        console.log('✅ API KEY MANAGEMENT: Hardwired credentials set in localStorage')
+
+        const storedApiKeys = {
+          retell_api_key: settings.retellApiKey || '',
+          call_agent_id: settings.callAgentId || '',
+          sms_agent_id: settings.smsAgentId || ''
+        }
+
+        // Set in component state
+        setApiKeys(storedApiKeys)
+        setOriginalApiKeys({ ...storedApiKeys })
+
+        // Update retell service if keys exist
+        if (storedApiKeys.retell_api_key) {
+          retellService.updateCredentials(
+            storedApiKeys.retell_api_key,
+            storedApiKeys.call_agent_id,
+            storedApiKeys.sms_agent_id
+          )
+        }
+
+        console.log('✅ API KEY MANAGEMENT: Loaded stored credentials from localStorage')
       }
     } catch (error) {
-      console.warn('Failed to update localStorage with hardwired credentials:', error)
+      console.warn('Failed to load stored credentials:', error)
     }
-
-    console.log('✅ API KEY MANAGEMENT: Hardwired credentials loaded successfully')
   }
 
 
@@ -168,8 +164,8 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
           })
 
           const localApiKeys = {
-            retell_api_key: settings.retellApiKey || 'key_3660938283961c067186004a50e3',
-            call_agent_id: settings.callAgentId || 'agent_ca2a01536c2e94d0ff4e50df70',
+            retell_api_key: settings.retellApiKey || '',
+            call_agent_id: settings.callAgentId || '',
             sms_agent_id: settings.smsAgentId || ''
           }
 
@@ -207,12 +203,12 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
 
         // Check if the API key is encrypted
         if (response.data.retell_api_key?.includes('cbc:') || response.data.retell_api_key?.includes('gcm:')) {
-          console.log('Received encrypted API key from service - setting known correct key')
+          console.log('Received encrypted API key from service - clearing encrypted values')
 
-          // Use the known correct ARTLEE API key instead
+          // Don't use any hardcoded fallbacks - just clear encrypted values
           const correctApiKeys = {
-            retell_api_key: 'key_3660938283961c067186004a50e3',
-            call_agent_id: response.data.call_agent_id || 'agent_ca2a01536c2e94d0ff4e50df70',
+            retell_api_key: '',
+            call_agent_id: response.data.call_agent_id || '',
             sms_agent_id: response.data.sms_agent_id || ''
           }
 
@@ -242,8 +238,8 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
         } else {
           // Use the response data as-is (not encrypted)
           const loadedApiKeys = {
-            retell_api_key: response.data.retell_api_key || 'key_3660938283961c067186004a50e3',
-            call_agent_id: response.data.call_agent_id || 'agent_ca2a01536c2e94d0ff4e50df70',
+            retell_api_key: response.data.retell_api_key || '',
+            call_agent_id: response.data.call_agent_id || '',
             sms_agent_id: response.data.sms_agent_id || ''
           }
 
@@ -259,10 +255,10 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
           )
         }
       } else {
-        console.log('No API keys found, using ARTLEE default values and saving to cloud')
+        console.log('No API keys found, starting with blank values')
         const defaultApiKeys = {
-          retell_api_key: 'key_3660938283961c067186004a50e3',
-          call_agent_id: 'agent_ca2a01536c2e94d0ff4e50df70',
+          retell_api_key: '',
+          call_agent_id: '',
           sms_agent_id: ''
         }
 
@@ -270,44 +266,21 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
         // Update original state to match loaded values
         setOriginalApiKeys({ ...defaultApiKeys })
 
-        // Save defaults to localStorage immediately
-        if (currentUser.id) {
-          const settings = JSON.parse(localStorage.getItem(`settings_${currentUser.id}`) || '{}')
-          settings.retellApiKey = defaultApiKeys.retell_api_key
-          settings.callAgentId = defaultApiKeys.call_agent_id
-          settings.smsAgentId = defaultApiKeys.sms_agent_id
-          localStorage.setItem(`settings_${currentUser.id}`, JSON.stringify(settings))
-          console.log('Saved default API keys to localStorage')
-        }
-
-        // Save defaults to cloud for cross-device sync
-        try {
-          await enhancedUserService.updateUserApiKeys(user.id, defaultApiKeys)
-          console.log('Saved default API keys to cloud storage for cross-device sync')
-        } catch (cloudError) {
-          console.warn('Failed to save default API keys to cloud:', cloudError)
-        }
-
-        // Update retell service
-        retellService.updateCredentials(
-          defaultApiKeys.retell_api_key,
-          defaultApiKeys.call_agent_id,
-          defaultApiKeys.sms_agent_id
-        )
+        console.log('Initialized with blank API keys - user will need to configure')
       }
     } catch (err: any) {
       console.error('Exception loading API keys:', err)
       setError(`Failed to load API keys: ${err.message}`)
       const defaultApiKeys = {
-        retell_api_key: 'key_3660938283961c067186004a50e3',
-        call_agent_id: 'agent_ca2a01536c2e94d0ff4e50df70',
+        retell_api_key: '',
+        call_agent_id: '',
         sms_agent_id: ''
       }
 
       setApiKeys(defaultApiKeys)
       // Update original state to match loaded values
       setOriginalApiKeys({ ...defaultApiKeys })
-      console.log('Using default API keys due to loading error')
+      console.log('Using blank API keys due to loading error')
     } finally {
       setIsLoading(false)
     }
@@ -414,8 +387,12 @@ export const EnhancedApiKeyManager: React.FC<EnhancedApiKeyManagerProps> = ({ us
       setOriginalApiKeys({ ...trimmedApiKeys })
       setHasUnsavedChanges(false)
 
-      // Success message
-      setSuccessMessage('API keys saved successfully! Keys will persist across sessions.')
+      // Success message - only show if at least one key is provided
+      if (trimmedApiKeys.retell_api_key || trimmedApiKeys.call_agent_id || trimmedApiKeys.sms_agent_id) {
+        setSuccessMessage('API keys saved successfully! Keys will persist across sessions.')
+      } else {
+        setSuccessMessage('API keys cleared successfully.')
+      }
 
       // Dispatch event to notify other components
       window.dispatchEvent(new CustomEvent('apiConfigurationReady', {

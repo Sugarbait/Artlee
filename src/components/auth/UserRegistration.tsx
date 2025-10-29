@@ -79,10 +79,11 @@ export const UserRegistration: React.FC<UserRegistrationProps> = ({ onCancel, on
       const userData = {
         email: formData.email,
         name: formData.name,
-        role: isFirstUser ? 'super_user' : 'user', // First user = super_user, others = user
+        role: (isFirstUser ? 'super_user' : 'user') as 'super_user' | 'user', // First user = super_user, others = user
         isActive: isFirstUser ? true : false, // First user auto-activated, others need approval
-        department: formData.department || null,
-        phone: formData.phone || null
+        department: formData.department || undefined,
+        phone: formData.phone || undefined,
+        settings: {} // Empty settings object will be populated with defaults
       }
 
       const credentials = {
@@ -119,7 +120,7 @@ export const UserRegistration: React.FC<UserRegistrationProps> = ({ onCancel, on
           'Registration Complete'
         )
       } else {
-        const errorMsg = result.message || 'Registration failed. Please try again.'
+        const errorMsg = result.error || 'Registration failed. Please try again.'
         setError(errorMsg)
         generalToast.error(errorMsg, 'Registration Failed')
 
@@ -132,7 +133,7 @@ export const UserRegistration: React.FC<UserRegistrationProps> = ({ onCancel, on
           {
             operation: 'user_registration_failed',
             email: formData.email,
-            failureReason: result.message || result.error || 'Unknown error'
+            failureReason: result.error || 'Unknown error'
           }
         )
       }

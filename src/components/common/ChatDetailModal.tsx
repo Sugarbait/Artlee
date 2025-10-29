@@ -12,7 +12,6 @@ import {
   TrendingUpIcon,
   PhoneIcon,
   AlertCircleIcon,
-  StopCircleIcon,
   PlayCircleIcon,
   MessageSquareIcon,
   RefreshCwIcon,
@@ -20,7 +19,7 @@ import {
 } from 'lucide-react'
 import { Chat, chatService } from '@/services/chatService'
 import { ChatNotes } from './ChatNotes'
-import { twilioCostService, twilioApiService, currencyService } from '@/services'
+import { twilioCostService } from '@/services'
 import { patientIdService } from '@/services/patientIdService'
 import { generalToast } from '@/services/generalToastService'
 import jsPDF from 'jspdf'
@@ -29,14 +28,12 @@ interface ChatDetailModalProps {
   chat: Chat
   isOpen: boolean
   onClose: () => void
-  onEndChat?: (chatId: string) => void
   onNotesChanged?: () => void
 }
 
-export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, onClose, onEndChat, onNotesChanged }) => {
+export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, onClose, onNotesChanged }) => {
   const [fullChat, setFullChat] = useState<Chat | null>(null)
   const [loadingFullTranscript, setLoadingFullTranscript] = useState(false)
-  const [transcriptError, setTranscriptError] = useState<string | null>(null)
   const [generatedPatientId, setGeneratedPatientId] = useState<string>('')
   const [patientRecord, setPatientRecord] = useState<any>(null)
 
@@ -61,8 +58,7 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
                          chat.metadata?.from_phone_number ||
                          chat.metadata?.to_phone_number ||
                          chat.collected_dynamic_variables?.phone_number ||
-                         chat.collected_dynamic_variables?.customer_phone_number ||
-                         chat.phone_number
+                         chat.collected_dynamic_variables?.customer_phone_number
 
       console.log('ChatDetailModal: Phone number detection:', {
         chat_id: chat.chat_id,
@@ -100,9 +96,8 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
     if (!chat?.chat_id) return
 
     setLoadingFullTranscript(true)
-    setTranscriptError(null)
 
-    try {
+    try{
       console.log('Loading full chat details for:', chat.chat_id)
       const fullChatDetails = await chatService.getChatById(chat.chat_id)
       console.log('Full chat details loaded:', fullChatDetails)
@@ -117,7 +112,6 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
 
     } catch (error) {
       console.error('Failed to load full chat details:', error)
-      setTranscriptError('Failed to load full transcript. Using available data.')
       // Fallback to original chat data
       setFullChat(chat)
     } finally {
@@ -265,7 +259,7 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
           if (message.tool_calls && message.tool_calls.length > 0) {
             yPosition += 3
             doc.setFont('helvetica', 'italic')
-            const toolCallsText = `Tool calls: ${message.tool_calls.map(tool => tool.function?.name || tool.type).join(', ')}`
+            const toolCallsText = `Tool calls: ${message.tool_calls.map((tool: any) => tool.function?.name || tool.type).join(', ')}`
             yPosition = addWrappedText(toolCallsText, margin + 10, yPosition, maxWidth - 10, 10)
           }
 
@@ -397,7 +391,7 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
       // Use the full chat data if available (which includes full messages)
       const chatToUse = fullChat || chat
 
-      let messages = []
+      let messages: any[] = []
       if (chatToUse.message_with_tool_calls && Array.isArray(chatToUse.message_with_tool_calls)) {
         messages = chatToUse.message_with_tool_calls
       } else if (chatToUse.transcript) {
@@ -424,7 +418,7 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
       // Use the full chat data if available (which includes full messages)
       const chatToUse = fullChat || chat
 
-      let messages = []
+      let messages: any[] = []
       if (chatToUse.message_with_tool_calls && Array.isArray(chatToUse.message_with_tool_calls)) {
         messages = chatToUse.message_with_tool_calls
       } else if (chatToUse.transcript) {
@@ -779,7 +773,7 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
                                     <div className="text-xs font-medium text-purple-700 mb-1">🔧 Tool Invocation</div>
                                     <div className="bg-purple-50 border border-purple-200 rounded px-3 py-2">
                                       <span className="text-purple-800 text-sm">
-                                        {message.tool_calls?.map(tool => tool.function?.name || tool.type).join(', ') ||
+                                        {message.tool_calls?.map((tool: any) => tool.function?.name || tool.type).join(', ') ||
                                          message.content.replace(/Tool Invocation:\s*/, '')}
                                       </span>
                                     </div>
@@ -850,7 +844,7 @@ export const ChatDetailModal: React.FC<ChatDetailModalProps> = ({ chat, isOpen, 
                                   {message.tool_calls && message.tool_calls.length > 0 && (
                                     <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded text-xs">
                                       <span className="font-medium text-purple-700">Tool calls:</span>
-                                      {message.tool_calls.map((tool, toolIndex) => (
+                                      {message.tool_calls.map((tool: any, toolIndex: number) => (
                                         <div key={toolIndex} className="ml-2 text-purple-800">
                                           🔧 {tool.function?.name || tool.type}
                                         </div>

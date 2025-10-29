@@ -192,24 +192,25 @@ export class CloudCredentialService {
 
   /**
    * Store user-specific credential override in cloud
+   * Phaeton AI CRM: Allows storing blank credentials for cross-device clearing
    */
   public async storeUserCredentials(userId: string, credentials: RetellCredentials): Promise<void> {
     try {
-      if (!validateCredentials(credentials)) {
-        throw new Error('Invalid credentials provided')
-      }
+      // For Phaeton AI CRM, allow storing blank credentials (for cross-device clearing)
+      // Skip validation to allow users to clear credentials across all devices
 
       const credentialRecord: CloudCredentialRecord = {
         credential_type: 'user_override',
-        api_key: credentials.apiKey,
-        call_agent_id: credentials.callAgentId,
-        sms_agent_id: credentials.smsAgentId,
+        api_key: credentials.apiKey || '',
+        call_agent_id: credentials.callAgentId || '',
+        sms_agent_id: credentials.smsAgentId || '',
         user_id: userId,
         is_active: true,
         metadata: {
           source: 'user_settings',
           created_by: userId,
-          purpose: 'user_specific_override'
+          purpose: 'user_specific_override',
+          timestamp: new Date().toISOString()
         }
       }
 
@@ -223,7 +224,7 @@ export class CloudCredentialService {
 
       if (error) throw error
 
-      console.log('📁 CloudCredentialService: Stored user credentials in cloud for:', userId)
+      console.log('📁 Phaeton AI: Stored user credentials in cloud for:', userId)
     } catch (error) {
       console.error('❌ CloudCredentialService: Failed to store user credentials:', error)
       throw error
@@ -309,24 +310,31 @@ export class CloudCredentialService {
 
   /**
    * Sync credentials to cloud for a user (called when user updates settings)
+   * Phaeton AI CRM: Stores blank values to allow clearing credentials across devices
    */
   public async syncUserCredentialsToCloud(userId: string, credentials: Partial<RetellCredentials>): Promise<void> {
     try {
-      // Get current bulletproof defaults for any missing fields
-      const bulletproof = getBulletproofCredentials()
-
+      // For Phaeton AI CRM, store credentials as-is (including blank values)
+      // This allows users to clear credentials across all devices
       const fullCredentials: RetellCredentials = {
-        apiKey: credentials.apiKey || bulletproof.apiKey,
-        callAgentId: credentials.callAgentId || bulletproof.callAgentId,
-        smsAgentId: credentials.smsAgentId || bulletproof.smsAgentId
+        apiKey: credentials.apiKey !== undefined ? credentials.apiKey : '',
+        callAgentId: credentials.callAgentId !== undefined ? credentials.callAgentId : '',
+        smsAgentId: credentials.smsAgentId !== undefined ? credentials.smsAgentId : ''
       }
 
-      if (validateCredentials(fullCredentials)) {
-        await this.storeUserCredentials(userId, fullCredentials)
-        console.log('✅ CloudCredentialService: Synced user credentials to cloud for:', userId)
+      // Allow storing even blank credentials (for cross-device clearing)
+      const allBlank = !fullCredentials.apiKey && !fullCredentials.callAgentId && !fullCredentials.smsAgentId
+
+      if (allBlank) {
+        console.log('📁 Phaeton AI - Storing blank credentials to cloud (user cleared API keys)')
+      } else if (validateCredentials(fullCredentials)) {
+        console.log('📁 Phaeton AI - Storing valid credentials to cloud')
       } else {
-        console.warn('⚠️ CloudCredentialService: Cannot sync invalid credentials for:', userId)
+        console.warn('⚠️ Phaeton AI - Storing partially filled credentials to cloud')
       }
+
+      await this.storeUserCredentials(userId, fullCredentials)
+      console.log('✅ Phaeton AI: Synced user credentials to cloud for:', userId)
     } catch (error) {
       console.error('❌ CloudCredentialService: Failed to sync user credentials to cloud:', error)
     }

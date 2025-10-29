@@ -23,6 +23,10 @@ interface CallDetailModalProps {
       confidence_score: number
     }
     cost?: number
+    phone_number?: string
+    from_number?: string
+    to_number?: string
+    call_summary?: string
   }
   isOpen: boolean
   onClose: () => void

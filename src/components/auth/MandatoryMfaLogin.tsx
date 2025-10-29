@@ -19,6 +19,7 @@ interface MandatoryMfaLoginProps {
     id: string
     email: string
     name?: string
+    mfaCheckFailed?: boolean
   }
   onMfaVerified: () => void
   onMfaCancel: () => void

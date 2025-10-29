@@ -1,18 +1,20 @@
 /**
  * Tenant Configuration for Multi-Tenant Isolation
  *
- * ARTLEE uses tenant-based data isolation to separate data from CareXPS.
+ * Phaeton AI CRM uses tenant-based data isolation to separate data from other tenants.
  * All database queries automatically filter by tenant_id.
  */
 
 export const TENANT_CONFIG = {
   // Current tenant for this application
-  CURRENT_TENANT: 'medex' as const,
+  CURRENT_TENANT: 'phaeton_ai' as const,
 
   // All available tenants
   TENANTS: {
     CAREXPS: 'carexps',
-    MEDEX: 'medex'
+    MEDEX: 'medex',
+    ARTLEE: 'artlee',
+    PHAETON_AI: 'phaeton_ai'
   } as const
 } as const
 

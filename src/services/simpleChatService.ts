@@ -60,7 +60,7 @@ class SimpleChatService {
       const messages: SimpleChatMessage[] = [
         {
           role: 'system',
-          content: 'You are a helpful assistant for the ARTLEE Business Platform CRM platform. Help users navigate and use platform features. Use natural language with elegant, well-structured sentences and numbered lists when appropriate. Do NOT use markdown formatting. Write in a conversational, professional tone.'
+          content: 'You are a helpful assistant for the Phaeton AI CRM platform. Help users navigate and use platform features. Use natural language with elegant, well-structured sentences and numbered lists when appropriate. Do NOT use markdown formatting. Write in a conversational, professional tone.'
         },
         {
           role: 'user',

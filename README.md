@@ -1,4 +1,4 @@
-# ARTLEE CRM
+# Phaeton AI CRM
 
 A modern business platform CRM built with React, TypeScript, and Vite.
 
@@ -33,7 +33,7 @@ npm run build
 
 ## Tenant Configuration
 
-This instance is configured for the **ARTLEE** tenant. See `src/config/tenantConfig.ts` for tenant settings.
+This instance is configured for the **Phaeton AI** tenant. See `src/config/tenantConfig.ts` for tenant settings.
 
 ---
 

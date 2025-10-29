@@ -375,7 +375,7 @@ export const SimpleUserManager: React.FC = () => {
         )
 
         generalToast.success(
-          `${user.name} is now a ${roleText}`,
+          `${user.name} is now a ${newRoleText}`,
           'Role Updated'
         )
       } else {

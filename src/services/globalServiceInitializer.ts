@@ -36,19 +36,10 @@ export class GlobalServiceInitializer {
     try {
       console.log('🔧 GLOBAL: Starting service initialization...')
 
-      // Hardwired credentials that should always be available
-      const hardwiredCredentials = {
-        apiKey: 'key_c3f084f5ca67781070e188b47d7f',
-        callAgentId: 'agent_447a1b9da540237693b0440df6',
-        smsAgentId: 'agent_643486efd4b5a0e9d7e094ab99'
-      }
+      // Phaeton AI CRM: No hardcoded credentials - load from user configuration
+      console.log('🔧 GLOBAL: Phaeton AI - Loading user-configured credentials...')
 
-      // Initialize retellService first
-      retellService.updateCredentials(
-        hardwiredCredentials.apiKey,
-        hardwiredCredentials.callAgentId,
-        hardwiredCredentials.smsAgentId
-      )
+      // Don't initialize with hardcoded credentials - load from storage instead
 
       // Load credentials asynchronously if possible
       try {

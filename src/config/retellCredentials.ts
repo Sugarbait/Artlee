@@ -1,10 +1,10 @@
 /**
- * Hardcoded Retell AI API Credentials
+ * Retell AI API Credentials Configuration
  *
- * These credentials are permanently embedded in the system for bulletproof persistence.
- * They serve as the ultimate fallback when all other storage methods fail.
+ * For Phaeton AI CRM, no credentials are hardcoded.
+ * Users must configure their own API keys via Settings > API Configuration.
  *
- * CRITICAL: These credentials are configured to work across all devices, users, and environments.
+ * This file provides the structure and validation utilities only.
  */
 
 export interface RetellCredentials {
@@ -14,44 +14,48 @@ export interface RetellCredentials {
 }
 
 /**
- * Production Retell AI Credentials - HARDCODED FOR BULLETPROOF PERSISTENCE
+ * Phaeton AI CRM - User Configuration Required
  *
- * ARTLEE Business Platform CRM - Replace these placeholder values with your actual Retell AI credentials
+ * No hardcoded credentials for Phaeton AI CRM.
+ * Users configure their own Retell AI credentials via Settings > API Configuration.
  *
- * These values are permanently embedded and will ALWAYS be available regardless of:
- * - localStorage clearing
- * - User account changes
- * - Cross-device sync issues
- * - Cloud service outages
- * - Browser session resets
+ * Credentials are stored in:
+ * - localStorage (primary)
+ * - Supabase database (cloud sync)
  *
- * TODO: Replace with actual ARTLEE Retell AI credentials:
+ * Required credential format:
  * 1. API Key (format: key_xxxxxxxxxxxxxxxxxxxxx)
  * 2. Call Agent ID (format: agent_xxxxxxxxxxxxxxxxxxxxx)
- * 3. SMS Agent ID (format: agent_xxxxxxxxxxxxxxxxxxxxx)
+ * 3. SMS Agent ID (format: agent_xxxxxxxxxxxxxxxxxxxxx - optional)
  */
 /**
- * ARTLEE Business Platform CRM - Production Credentials
- * Last Updated: 2025-10-03
+ * Phaeton AI CRM - Production Credentials
+ * Last Updated: 2025-10-10
  *
- * IMPORTANT: These are YOUR ARTLEE credentials that will be used across all devices
+ * IMPORTANT: No hardcoded credentials for Phaeton AI CRM - users configure their own
  */
 export const HARDCODED_RETELL_CREDENTIALS: RetellCredentials = {
-  // Retell AI API Key - ARTLEE Business Platform CRM
-  apiKey: 'key_3660938283961c067186004a50e3',
+  // Retell AI API Key - User must configure via Settings
+  apiKey: '',
 
-  // Call Agent ID for voice interactions - ARTLEE Voice Agent
-  callAgentId: 'agent_ca2a01536c2e94d0ff4e50df70',
+  // Call Agent ID for voice interactions - User must configure via Settings
+  callAgentId: '',
 
-  // SMS/Chat Agent ID for text-based interactions - ARTLEE Chat Agent (blank - not configured)
+  // SMS/Chat Agent ID for text-based interactions - User must configure via Settings
   smsAgentId: ''
 }
 
 /**
  * Credential validation utility
  * Note: SMS Agent ID is optional - can be empty string if SMS functionality is not configured
+ * Note: All credentials are optional for Phaeton AI CRM (user must configure)
  */
 export function validateCredentials(credentials: Partial<RetellCredentials>): boolean {
+  // For Phaeton AI CRM, allow empty credentials (user will configure their own)
+  if (!credentials.apiKey && !credentials.callAgentId && !credentials.smsAgentId) {
+    return true // All empty is valid - waiting for user configuration
+  }
+
   const hasValidApiKey = !!(credentials.apiKey && credentials.apiKey.startsWith('key_'))
   const hasValidCallAgent = !!(credentials.callAgentId && credentials.callAgentId.startsWith('agent_'))
   const hasValidSmsAgent = !credentials.smsAgentId || credentials.smsAgentId.startsWith('agent_')
@@ -61,18 +65,13 @@ export function validateCredentials(credentials: Partial<RetellCredentials>): bo
 
 /**
  * Get bulletproof credentials with validation
+ * Note: For Phaeton AI CRM, returns empty credentials (user must configure)
  */
 export function getBulletproofCredentials(): RetellCredentials {
-  // Always return the hardcoded credentials as they are guaranteed to be valid
+  // For Phaeton AI CRM, return empty credentials - user will configure their own
   const credentials = { ...HARDCODED_RETELL_CREDENTIALS }
 
-  // Validate before returning
-  if (!validateCredentials(credentials)) {
-    console.error('CRITICAL: Hardcoded credentials failed validation!')
-    throw new Error('Hardcoded credentials are invalid - this should never happen')
-  }
-
-  console.log('🔐 Bulletproof credentials loaded successfully')
+  console.log('🔐 Phaeton AI: No hardcoded credentials - user must configure via Settings')
   // Security: Do not log API keys or Agent IDs
 
   return credentials
