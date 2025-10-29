@@ -6,6 +6,8 @@
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { format, startOfDay, endOfDay } from 'date-fns'
+import { logoService } from './logoService'
+import { supabase, supabaseAdmin } from '@/config/supabase'
 
 interface DashboardMetrics {
   totalCalls: number
@@ -78,36 +80,167 @@ class PDFExportService {
     }
   }
 
+  /**
+   * Generate Dashboard Report and return as Blob for uploading
+   */
+  async generateDashboardReportBlob(
+    metrics: DashboardMetrics,
+    options: ExportOptions
+  ): Promise<Blob> {
+    try {
+      // Reset PDF
+      this.pdf = new jsPDF('p', 'mm', 'a4')
+
+      // Generate cover page
+      await this.generateCoverPage(metrics, options)
+
+      // Add new page for detailed metrics
+      this.pdf.addPage()
+      this.generateMetricsPage(metrics, options)
+
+      // Add charts page
+      this.pdf.addPage()
+      await this.generateChartsPage(metrics, options)
+
+      // Add summary page
+      this.pdf.addPage()
+      this.generateSummaryPage(metrics, options)
+
+      // Return PDF as Blob
+      return this.pdf.output('blob')
+
+    } catch (error) {
+      console.error('Failed to generate PDF report blob:', error)
+      throw new Error('Failed to generate PDF report')
+    }
+  }
+
+  /**
+   * Generate dashboard report, upload to Supabase Storage, and return download link
+   * @param metrics Dashboard metrics (already converted to CAD)
+   * @param options Export options
+   * @returns Object with download URL and filename
+   */
+  async uploadReportToStorage(
+    metrics: DashboardMetrics,
+    options: ExportOptions
+  ): Promise<{ success: boolean; downloadUrl?: string; filename?: string; error?: string }> {
+    const STORAGE_BUCKET = 'invoice-reports'
+
+    try {
+      console.log('📄 Generating PDF for storage upload...')
+
+      // Use service role client to bypass RLS (users may not be authenticated to Supabase)
+      const storageClient = supabaseAdmin || supabase
+      if (!supabaseAdmin) {
+        console.warn('⚠️ Service role key not available, using regular client (may fail due to RLS)')
+      } else {
+        console.log('✅ Using service role client for storage operations (bypasses RLS)')
+      }
+
+      // Reset PDF
+      this.pdf = new jsPDF('p', 'mm', 'a4')
+
+      // Generate cover page
+      await this.generateCoverPage(metrics, options)
+
+      // Add new page for detailed metrics
+      this.pdf.addPage()
+      this.generateMetricsPage(metrics, options)
+
+      // Add charts page
+      this.pdf.addPage()
+      await this.generateChartsPage(metrics, options)
+
+      // Add summary page
+      this.pdf.addPage()
+      this.generateSummaryPage(metrics, options)
+
+      // Get PDF as blob
+      const pdfBlob = this.pdf.output('blob')
+      const fileName = this.generateFileName(options)
+      const storagePath = `reports/${Date.now()}_${fileName}`
+
+      console.log(`📤 Uploading PDF to Supabase Storage: ${storagePath}`)
+      console.log(`📊 PDF size: ${(pdfBlob.size / 1024).toFixed(2)} KB`)
+
+      // Upload to Supabase Storage using service role client (bypasses RLS)
+      const { data: uploadData, error: uploadError } = await storageClient.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, pdfBlob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: 'application/pdf'
+        })
+
+      if (uploadError) {
+        console.error('❌ Supabase Storage upload failed:', uploadError.message)
+        return {
+          success: false,
+          error: `Upload failed: ${uploadError.message}`
+        }
+      }
+
+      console.log('✅ PDF uploaded successfully to Supabase Storage')
+
+      // Generate signed URL (30 days expiry for invoice PDFs) using service role client
+      const EXPIRY_SECONDS = 30 * 24 * 60 * 60 // 30 days
+      const { data: signedUrlData, error: signedUrlError } = await storageClient.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(storagePath, EXPIRY_SECONDS)
+
+      if (signedUrlError) {
+        console.error('❌ Failed to generate signed URL:', signedUrlError.message)
+        // Try to clean up uploaded file using service role client
+        await storageClient.storage.from(STORAGE_BUCKET).remove([storagePath])
+        return {
+          success: false,
+          error: `Failed to generate download link: ${signedUrlError.message}`
+        }
+      }
+
+      console.log('✅ Signed URL generated successfully')
+      console.log(`🔗 Download link expires in 30 days`)
+
+      return {
+        success: true,
+        downloadUrl: signedUrlData.signedUrl,
+        filename: fileName
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to upload PDF to storage:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }
+  }
+
   private async generateCoverPage(metrics: DashboardMetrics, options: ExportOptions): Promise<void> {
     const centerX = this.pageWidth / 2
 
-    // Header gradient background (simulated with rectangles)
-    this.pdf.setFillColor(59, 130, 246) // Blue-600
-    this.pdf.rect(0, 0, this.pageWidth, 80, 'F')
-
-    this.pdf.setFillColor(147, 197, 253) // Blue-300
-    this.pdf.rect(0, 60, this.pageWidth, 20, 'F')
-
-    // Add CareXPS logo
+    // Add ARTLEE Brand Logo (no background)
     try {
       await this.addLogoToPDF(centerX, 15)
     } catch (error) {
       console.error('Failed to load logo, continuing without it:', error)
     }
 
-    // Company title and report info
-    this.pdf.setTextColor(255, 255, 255)
+    // Company title and report info (dark text, no background)
+    this.pdf.setTextColor(31, 41, 55) // Gray-800
     this.pdf.setFontSize(24)
     this.pdf.setFont('helvetica', 'bold')
-    this.pdf.text(options.companyName || 'CareXPS Business Platform CRM', centerX, 45, { align: 'center' })
+    this.pdf.text(options.companyName || 'ARTLEE Business CRM', centerX, 60, { align: 'center' })
 
     this.pdf.setFontSize(16)
     this.pdf.setFont('helvetica', 'normal')
-    this.pdf.text('Dashboard Analytics Report', centerX, 58, { align: 'center' })
+    this.pdf.setTextColor(75, 85, 99) // Gray-600
+    this.pdf.text('Dashboard Analytics Report', centerX, 73, { align: 'center' })
 
     // Date range
     this.pdf.setFontSize(11)
-    this.pdf.text(`Report Period: ${options.dateRange}`, centerX, 70, { align: 'center' })
+    this.pdf.text(`Report Period: ${options.dateRange}`, centerX, 83, { align: 'center' })
 
     // Key metrics summary box
     this.pdf.setFillColor(249, 250, 251) // Gray-50
@@ -303,11 +436,11 @@ class PDFExportService {
     this.pdf.setFontSize(20)
     this.pdf.setFont('helvetica', 'bold')
     this.pdf.text('Visual Analytics', this.margin, yPosition)
-    yPosition += 20
+    yPosition += 25
 
     // Cost breakdown pie chart
     await this.generateCostBreakdownChart(metrics, yPosition)
-    yPosition += 90
+    yPosition += 100 // Space for pie chart + legend
 
     // Performance metrics chart
     await this.generatePerformanceChart(metrics, yPosition)
@@ -315,7 +448,6 @@ class PDFExportService {
 
   private async generateCostBreakdownChart(metrics: DashboardMetrics, yPosition: number): Promise<void> {
     const centerX = this.pageWidth / 2
-    const chartRadius = 30
 
     // Chart title
     this.pdf.setFontSize(14)
@@ -329,25 +461,49 @@ class PDFExportService {
     const callPercentage = totalCost > 0 ? (metrics.totalCost / totalCost) * 100 : 0
     const smsPercentage = totalCost > 0 ? (metrics.totalSMSCost / totalCost) * 100 : 0
 
-    // Draw pie chart
-    const chartCenterY = yPosition + chartRadius
+    // Create canvas for pie chart
+    const canvas = document.createElement('canvas')
+    const size = 300
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+
+    const centerXCanvas = size / 2
+    const centerYCanvas = size / 2
+    const radius = size / 2.5
 
     if (totalCost > 0) {
-      // Call costs slice
-      this.pdf.setFillColor(59, 130, 246) // Blue-600
-      this.drawPieSlice(centerX, chartCenterY, chartRadius, 0, (callPercentage / 100) * 2 * Math.PI)
+      // Draw Call costs slice (blue)
+      ctx.fillStyle = '#3b82f6'
+      ctx.beginPath()
+      ctx.moveTo(centerXCanvas, centerYCanvas)
+      ctx.arc(centerXCanvas, centerYCanvas, radius, 0, (callPercentage / 100) * 2 * Math.PI)
+      ctx.closePath()
+      ctx.fill()
 
-      // SMS costs slice
-      this.pdf.setFillColor(168, 85, 247) // Purple-600
-      this.drawPieSlice(centerX, chartCenterY, chartRadius, (callPercentage / 100) * 2 * Math.PI, 2 * Math.PI)
+      // Draw SMS costs slice (purple)
+      ctx.fillStyle = '#a855f7'
+      ctx.beginPath()
+      ctx.moveTo(centerXCanvas, centerYCanvas)
+      ctx.arc(centerXCanvas, centerYCanvas, radius, (callPercentage / 100) * 2 * Math.PI, 2 * Math.PI)
+      ctx.closePath()
+      ctx.fill()
     } else {
-      // Empty state
-      this.pdf.setFillColor(229, 231, 235) // Gray-200
-      this.pdf.circle(centerX, chartCenterY, chartRadius, 'F')
+      // Empty state (gray circle)
+      ctx.fillStyle = '#e5e7eb'
+      ctx.beginPath()
+      ctx.arc(centerXCanvas, centerYCanvas, radius, 0, 2 * Math.PI)
+      ctx.fill()
     }
 
+    // Convert canvas to image and add to PDF
+    const imgData = canvas.toDataURL('image/png')
+    const chartWidth = 60
+    const chartHeight = 60
+    this.pdf.addImage(imgData, 'PNG', centerX - chartWidth / 2, yPosition, chartWidth, chartHeight)
+
     // Legend
-    const legendY = chartCenterY + chartRadius + 15
+    const legendY = yPosition + chartHeight + 10
     this.generateChartLegend([
       { label: `Call Costs: CAD $${metrics.totalCost.toFixed(2)} (${callPercentage.toFixed(1)}%)`, color: [59, 130, 246] },
       { label: `SMS Costs: CAD $${metrics.totalSMSCost.toFixed(2)} (${smsPercentage.toFixed(1)}%)`, color: [168, 85, 247] }
@@ -391,16 +547,6 @@ class PDFExportService {
     this.pdf.text(`Message Delivery: ${metrics.messageDeliveryRate.toFixed(1)}%`, chartX + 5, chartY + 32)
   }
 
-  private drawPieSlice(centerX: number, centerY: number, radius: number, startAngle: number, endAngle: number): void {
-    const startX = centerX + radius * Math.cos(startAngle)
-    const startY = centerY + radius * Math.sin(startAngle)
-    const endX = centerX + radius * Math.cos(endAngle)
-    const endY = centerY + radius * Math.sin(endAngle)
-
-    // For simplicity, we'll draw sectors as triangular approximations
-    this.pdf.triangle(centerX, centerY, startX, startY, endX, endY, 'F')
-  }
-
   private generateChartLegend(items: Array<{ label: string; color: [number, number, number] }>, yPosition: number): void {
     items.forEach((item, index) => {
       const x = this.margin + 20
@@ -433,10 +579,6 @@ class PDFExportService {
 
     // Recommendations
     this.generateRecommendationsSection(metrics, yPosition)
-    yPosition += 80
-
-    // Compliance notice
-    this.generateComplianceSection(yPosition)
   }
 
   private generateHighlightsSection(metrics: DashboardMetrics, yPosition: number): void {
@@ -505,31 +647,6 @@ class PDFExportService {
     return recommendations.slice(0, 4)
   }
 
-  private generateComplianceSection(yPosition: number): void {
-    // Compliance box
-    this.pdf.setFillColor(254, 242, 242) // Red-50
-    this.pdf.setDrawColor(252, 165, 165) // Red-300
-    this.pdf.roundedRect(this.margin, yPosition, this.pageWidth - 2 * this.margin, 40, 3, 3, 'FD')
-
-    this.pdf.setFontSize(12)
-    this.pdf.setFont('helvetica', 'bold')
-    this.pdf.setTextColor(153, 27, 27) // Red-800
-    this.pdf.text('Compliance Notice', this.margin + 5, yPosition + 12)
-
-    this.pdf.setFontSize(9)
-    this.pdf.setFont('helvetica', 'normal')
-    this.pdf.setTextColor(127, 29, 29) // Red-900
-
-    const complianceText = [
-      'This report contains Protected Health Information (PHI) and is subject to regulations.',
-      'Unauthorized disclosure is prohibited. Handle according to your organization\'s privacy policies.',
-      'All data has been encrypted and anonymized where possible to ensure patient privacy.'
-    ]
-
-    complianceText.forEach((text, index) => {
-      this.pdf.text(text, this.margin + 5, yPosition + 20 + index * 5)
-    })
-  }
 
   private generateFileName(options: ExportOptions): string {
     const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm')
@@ -539,36 +656,45 @@ class PDFExportService {
 
   private async addLogoToPDF(centerX: number, y: number): Promise<void> {
     try {
-      // Try to load the logo - first try local copy, then fallback to external URL
-      let logoUrl = '/images/Logo.png'
-      let response = await fetch(logoUrl).catch(() => null)
+      // First, try to get the uploaded brand header logo from Company Branding
+      const companyLogos = await logoService.getLogos()
+      let logoData = companyLogos.headerLogo
 
-      if (!response || !response.ok) {
-        // Try external URL as fallback
-        logoUrl = 'https://nexasync.ca/images/Logo.png'
-        response = await fetch(logoUrl).catch(() => null)
+      // If no custom logo uploaded, fall back to default logo
+      if (!logoData) {
+        const logoUrl = '/images/Logo.png'
+        const response = await fetch(logoUrl).catch(() => null)
+
+        if (!response || !response.ok) {
+          // Silently skip logo if unavailable
+          return
+        }
+
+        const blob = await response.blob()
+        logoData = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = () => reject(new Error('Failed to read image'))
+          reader.readAsDataURL(blob)
+        })
       }
 
-      if (!response.ok) {
-        // Silently skip logo if unavailable to reduce console noise
-        return
-      }
-
-      const blob = await response.blob()
-
+      // Now add the logo (either custom or default) to PDF
       return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
+        const img = new Image()
+        img.onload = () => {
           try {
-            const base64Data = reader.result as string
+            // Calculate dimensions maintaining proper aspect ratio
+            const maxWidth = 60 // mm - maximum logo width
+            const naturalAspectRatio = img.naturalWidth / img.naturalHeight
 
-            // Calculate logo dimensions (maintaining aspect ratio)
-            const logoWidth = 30 // mm
-            const logoHeight = 15 // mm (approximate 2:1 ratio)
+            // Calculate final dimensions preserving aspect ratio
+            let logoWidth = maxWidth
+            let logoHeight = maxWidth / naturalAspectRatio
 
-            // Add the logo to the PDF
+            // Add the logo to the PDF with proper aspect ratio
             this.pdf.addImage(
-              base64Data,
+              logoData,
               'PNG',
               centerX - logoWidth / 2, // Center horizontally
               y,
@@ -581,12 +707,12 @@ class PDFExportService {
             reject(error)
           }
         }
-        reader.onerror = () => reject(new Error('Failed to read image'))
-        reader.readAsDataURL(blob)
+        img.onerror = () => reject(new Error('Failed to load image'))
+        img.src = logoData
       })
     } catch (error) {
-      // Silently skip logo if there's a CORS or network error
-      // This prevents console errors while maintaining PDF generation
+      // Silently skip logo if there's an error
+      console.error('Failed to add logo to PDF:', error)
       return
     }
   }

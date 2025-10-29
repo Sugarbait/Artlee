@@ -1,0 +1,153 @@
+-- ============================================================================
+-- Complete Invoice History Migration (Safe Version)
+-- This script checks for existing objects before creating them
+-- ARTLEE CRM - Stripe Invoice Management System
+-- ============================================================================
+
+-- Drop existing policies if they exist (safe way to recreate)
+DROP POLICY IF EXISTS "Users can view own invoices" ON invoice_history;
+DROP POLICY IF EXISTS "Users can insert own invoices" ON invoice_history;
+DROP POLICY IF EXISTS "Users can update own invoices" ON invoice_history;
+DROP POLICY IF EXISTS "Users can delete own invoices" ON invoice_history;
+
+-- Create invoice_history table (IF NOT EXISTS)
+CREATE TABLE IF NOT EXISTS invoice_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  tenant_id TEXT NOT NULL DEFAULT 'artlee',
+
+  -- Stripe identifiers
+  invoice_id TEXT NOT NULL,
+  customer_id TEXT,
+  customer_email TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+
+  -- Invoice period
+  period_start TIMESTAMPTZ,
+  period_end TIMESTAMPTZ,
+  invoice_month TEXT,
+
+  -- Cost breakdown
+  call_count INTEGER DEFAULT 0,
+  call_cost_cad DECIMAL(10,4) DEFAULT 0,
+  sms_count INTEGER DEFAULT 0,
+  sms_segments INTEGER DEFAULT 0,
+  sms_cost_cad DECIMAL(10,4) DEFAULT 0,
+  total_cost_cad DECIMAL(10,4) NOT NULL,
+
+  -- Invoice status and URLs
+  invoice_status TEXT DEFAULT 'finalized',
+  invoice_url TEXT,
+
+  -- Generation tracking
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  generated_by TEXT,
+  sent_at TIMESTAMPTZ,
+  paid_at TIMESTAMPTZ,
+
+  -- Retry tracking (for automatic invoicing)
+  retry_count INTEGER DEFAULT 0,
+  last_retry_at TIMESTAMPTZ,
+  error_message TEXT,
+
+  -- Metadata
+  generated_automatically BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- Constraints
+  CONSTRAINT invoice_history_unique_invoice_id UNIQUE (invoice_id, tenant_id)
+);
+
+-- ============================================================================
+-- Row Level Security (RLS) Policies
+-- ============================================================================
+
+-- Enable RLS
+ALTER TABLE invoice_history ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can view their own invoices in their tenant
+CREATE POLICY "Users can view own invoices"
+  ON invoice_history
+  FOR SELECT
+  USING (user_id::text = (SELECT id::text FROM auth.users WHERE auth.users.id::text = auth.uid()::text));
+
+-- Policy: System can insert invoices (using service role or authenticated users)
+CREATE POLICY "Users can insert own invoices"
+  ON invoice_history
+  FOR INSERT
+  WITH CHECK (user_id::text = (SELECT id::text FROM auth.users WHERE auth.users.id::text = auth.uid()::text));
+
+-- Policy: Users can update their own invoices
+CREATE POLICY "Users can update own invoices"
+  ON invoice_history
+  FOR UPDATE
+  USING (user_id::text = (SELECT id::text FROM auth.users WHERE auth.users.id::text = auth.uid()::text));
+
+-- Policy: Users can delete their own invoices
+CREATE POLICY "Users can delete own invoices"
+  ON invoice_history
+  FOR DELETE
+  USING (user_id::text = (SELECT id::text FROM auth.users WHERE auth.users.id::text = auth.uid()::text));
+
+-- ============================================================================
+-- Indexes for Performance
+-- ============================================================================
+
+CREATE INDEX IF NOT EXISTS invoice_history_user_id_idx
+  ON invoice_history(user_id);
+
+CREATE INDEX IF NOT EXISTS invoice_history_tenant_id_idx
+  ON invoice_history(tenant_id);
+
+CREATE INDEX IF NOT EXISTS invoice_history_generated_at_idx
+  ON invoice_history(generated_at DESC);
+
+CREATE INDEX IF NOT EXISTS invoice_history_invoice_status_idx
+  ON invoice_history(invoice_status);
+
+CREATE INDEX IF NOT EXISTS invoice_history_customer_email_idx
+  ON invoice_history(customer_email);
+
+CREATE INDEX IF NOT EXISTS invoice_history_invoice_month_idx
+  ON invoice_history(invoice_month);
+
+-- ============================================================================
+-- Updated_at Trigger
+-- ============================================================================
+
+-- Drop existing trigger and function if they exist
+DROP TRIGGER IF EXISTS trigger_invoice_history_updated_at ON invoice_history;
+DROP FUNCTION IF EXISTS update_invoice_history_updated_at();
+
+CREATE OR REPLACE FUNCTION update_invoice_history_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_invoice_history_updated_at
+  BEFORE UPDATE ON invoice_history
+  FOR EACH ROW
+  EXECUTE FUNCTION update_invoice_history_updated_at();
+
+-- ============================================================================
+-- Comments for Documentation
+-- ============================================================================
+
+COMMENT ON TABLE invoice_history IS 'Stores invoice generation history with cross-device synchronization for ARTLEE CRM';
+COMMENT ON COLUMN invoice_history.user_id IS 'User who generated the invoice (for RLS filtering)';
+COMMENT ON COLUMN invoice_history.tenant_id IS 'Tenant identifier for multi-tenant isolation (artlee, medex, carexps)';
+COMMENT ON COLUMN invoice_history.invoice_id IS 'Unique Stripe invoice ID';
+COMMENT ON COLUMN invoice_history.generated_automatically IS 'True if generated by scheduled job, false if manual';
+
+-- ============================================================================
+-- Verification Query
+-- ============================================================================
+
+-- Check if table exists and is accessible
+SELECT 'Migration completed successfully!' as message,
+       COUNT(*) as existing_invoices
+FROM invoice_history;

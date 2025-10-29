@@ -6,6 +6,11 @@ import { retellService, currencyService, twilioCostService, chatService } from '
 import { pdfExportService } from '@/services/pdfExportService'
 import { userSettingsService } from '@/services'
 import { SiteHelpChatbot } from '@/components/common/SiteHelpChatbot'
+import { stripeInvoiceService } from '@/services/stripeInvoiceService'
+import { invoiceHistoryService } from '@/services/invoiceHistoryService'
+import { invoiceEmailService } from '@/services/invoiceEmailService'
+import { generalToast } from '@/services/generalToastService'
+import { supabase } from '@/config/supabase'
 import {
   PhoneIcon,
   MessageSquareIcon,
@@ -20,7 +25,10 @@ import {
   ThumbsUpIcon,
   AlertCircleIcon,
   BarChart3Icon,
-  TrashIcon
+  TrashIcon,
+  FileTextIcon,
+  XIcon,
+  LockIcon
 } from 'lucide-react'
 
 interface DashboardPageProps {
@@ -64,6 +72,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
 
   const [error, setError] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+
+  // Invoice generation state
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false)
+  const [invoiceCustomerName, setInvoiceCustomerName] = useState('')
+  const [invoiceCustomerEmail] = useState('elitesquadp@protonmail.com') // TESTING: Using test email until confirmed working
 
   // Track shown errors to prevent duplicates
   const shownErrors = React.useRef<Set<string>>(new Set())
@@ -237,6 +251,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
   // Load credentials and fetch initial data on mount
   useEffect(() => {
     console.log('🚀 Dashboard: Initial mount - loading credentials and data')
+
+    // Initialize Stripe service
+    const initStripe = async () => {
+      const result = await stripeInvoiceService.initialize()
+      if (result.success) {
+        console.log('✅ Stripe invoice service initialized')
+      } else {
+        console.warn('⚠️ Stripe invoice service initialization failed:', result.error)
+      }
+    }
+
+    initStripe()
     fetchDashboardData()
   }, []) // Empty dependency array = run once on mount
 
@@ -920,7 +946,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
       console.log('- Real chats loaded:', filteredChats.length)
 
       // Show warning if no real data available
-      if (allCalls.length === 0 && allChatsResponse.chats.length === 0) {
+      if (allCalls.length === 0 && chatsResponse.chats.length === 0) {
         console.warn('⚠️ No data available in your Retell AI account. Dashboard will show empty metrics.')
         console.warn('⚠️ Make some test calls/SMS using your Retell AI agents to see real data.')
       }
@@ -1028,7 +1054,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
     try {
       const { start, end } = getDateRangeFromSelection(selectedDateRange, customStartDate, customEndDate)
 
-      await pdfExportService.generateDashboardReport(metrics, {
+      // Convert metrics to CAD for PDF (same conversion as dashboard display)
+      const cadMetrics = {
+        ...metrics,
+        totalCost: (metrics.totalCost || 0) * 1.45,
+        avgCostPerCall: (metrics.avgCostPerCall || 0) * 1.45,
+        highestCostCall: (metrics.highestCostCall || 0) * 1.45,
+        lowestCostCall: (metrics.lowestCostCall || 0) * 1.45,
+        totalSMSCost: (metrics.totalSMSCost || 0) * 1.45,
+        avgCostPerMessage: (metrics.avgCostPerMessage || 0) * 1.45
+      }
+
+      await pdfExportService.generateDashboardReport(cadMetrics, {
         dateRange: selectedDateRange,
         startDate: start,
         endDate: end,
@@ -1057,6 +1094,155 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
     } catch (error) {
       console.error('Failed to clear cache:', error)
       setError('Failed to clear cache. Please try again.')
+    }
+  }
+
+  const handleGenerateInvoice = async () => {
+    // Validation
+    if (!invoiceCustomerName.trim()) {
+      setError('Customer name is required')
+      return
+    }
+    if (!invoiceCustomerEmail.trim()) {
+      setError('Customer email is required')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invoiceCustomerEmail)) {
+      setError('Invalid email format')
+      return
+    }
+
+    setIsGeneratingInvoice(true)
+    setError('')
+
+    try {
+      const { start, end } = getDateRangeFromSelection(selectedDateRange, customStartDate, customEndDate)
+
+      // Use pre-calculated metrics from Dashboard
+      // Use appropriate customer name based on email
+      const customerDescription = invoiceCustomerEmail.trim() === 'create@artlee.agency'
+        ? 'Artlee Agency Customer'
+        : 'Artlee Creative Customer'
+
+      const result = await stripeInvoiceService.createInvoice({
+        customerInfo: {
+          email: invoiceCustomerEmail.trim(),
+          name: invoiceCustomerName.trim(),
+          description: customerDescription
+        },
+        dateRange: {
+          start,
+          end,
+          label: `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+        },
+        preCalculatedMetrics: {
+          totalCalls: metrics.totalCalls || 0,
+          callCostCAD: (metrics.totalCost || 0) * 1.45,  // Convert USD to CAD
+          totalChats: metrics.totalMessages || 0,
+          totalSegments: metrics.totalSegments || 0,
+          smsCostCAD: (metrics.totalSMSCost || 0) * 1.45  // Convert USD to CAD
+        }
+      })
+
+      if (result.success && result.invoiceId) {
+        // Save to local history
+        await invoiceHistoryService.createInvoice({
+          invoiceId: result.invoiceId,
+          customerEmail: invoiceCustomerEmail.trim(),
+          customerName: invoiceCustomerName.trim(),
+          periodStart: start,
+          periodEnd: end,
+          callCount: metrics.totalCalls || 0,
+          callCostCad: (metrics.totalCost || 0) * 1.45,  // Convert USD to CAD
+          smsCount: metrics.totalMessages || 0,
+          smsSegments: metrics.totalSegments || 0,
+          smsCostCad: (metrics.totalSMSCost || 0) * 1.45,  // Convert USD to CAD
+          totalCostCad: ((metrics.totalCost || 0) + (metrics.totalSMSCost || 0)) * 1.45,  // Convert USD to CAD
+          invoiceUrl: result.invoiceUrl,
+          invoiceStatus: 'draft',
+          generatedAutomatically: false
+        })
+
+        // Upload PDF report to Supabase Storage and get download link
+        console.log('📤 Uploading PDF report to Supabase Storage...')
+
+        // Convert metrics to CAD for PDF (same conversion as dashboard display)
+        const cadMetrics = {
+          ...metrics,
+          totalCost: (metrics.totalCost || 0) * 1.45,
+          avgCostPerCall: (metrics.avgCostPerCall || 0) * 1.45,
+          highestCostCall: (metrics.highestCostCall || 0) * 1.45,
+          lowestCostCall: (metrics.lowestCostCall || 0) * 1.45,
+          totalSMSCost: (metrics.totalSMSCost || 0) * 1.45,
+          avgCostPerMessage: (metrics.avgCostPerMessage || 0) * 1.45
+        }
+
+        const pdfUploadResult = await pdfExportService.uploadReportToStorage(cadMetrics, {
+          dateRange: selectedDateRange,
+          startDate: start,
+          endDate: end,
+          companyName: 'ARTLEE Business Platform CRM',
+          reportTitle: `Invoice ${result.invoiceId} - Dashboard Report`
+        })
+
+        // CRITICAL: pdf_download_link should ONLY be the Dashboard PDF, never the Stripe invoice
+        // The Stripe invoice has its own button (Pay Invoice in Stripe)
+        let pdfDownloadLink = pdfUploadResult.downloadUrl || ''
+
+        if (!pdfUploadResult.success) {
+          console.error('❌ PDF upload failed:', pdfUploadResult.error)
+          console.error('⚠️ Email will be sent WITHOUT Dashboard PDF download link')
+        } else {
+          console.log('✅ PDF upload successful:', {
+            filename: pdfUploadResult.filename,
+            downloadUrl: pdfUploadResult.downloadUrl
+          })
+        }
+
+        // Send invoice email
+        console.log('📧 Sending invoice email...')
+        console.log('📄 PDF Download Link:', pdfDownloadLink)
+        const emailResult = await invoiceEmailService.sendInvoiceEmail({
+          to_email: invoiceCustomerEmail.trim(),
+          to_name: invoiceCustomerName.trim(),
+          invoice_id: result.invoiceId,
+          date_range: `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+          total_amount: `CAD $${(((metrics.totalCost || 0) + (metrics.totalSMSCost || 0)) * 1.45).toFixed(2)}`,
+          total_calls: metrics.totalCalls || 0,
+          call_cost: `CAD $${((metrics.totalCost || 0) * 1.45).toFixed(2)}`,
+          total_chats: metrics.totalMessages || 0,
+          sms_cost: `CAD $${((metrics.totalSMSCost || 0) * 1.45).toFixed(2)}`,
+          invoice_url: result.invoiceUrl || '',
+          pdf_download_link: pdfDownloadLink,
+          pdf_expiry_days: 30
+        })
+
+        // Clear form and close modal
+        setInvoiceCustomerName('')
+        setIsInvoiceModalOpen(false)
+
+        // Show success message based on email result
+        if (emailResult.success) {
+          generalToast.success(
+            `Invoice generated and emailed successfully! Invoice ID: ${result.invoiceId}. Email sent to ${invoiceCustomerEmail.trim()}.`,
+            'Invoice Sent',
+            7000
+          )
+        } else {
+          generalToast.warning(
+            `Invoice generated successfully (ID: ${result.invoiceId}) but email failed to send. Error: ${emailResult.error || 'Unknown error'}`,
+            'Email Failed',
+            8000
+          )
+        }
+      } else {
+        setError(result.error || 'Failed to generate invoice')
+      }
+    } catch (error) {
+      console.error('Invoice generation error:', error)
+      setError('Failed to generate invoice. Please try again.')
+    } finally {
+      setIsGeneratingInvoice(false)
     }
   }
 
@@ -1111,6 +1297,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
             <TrashIcon className="w-4 h-4" />
             Clear Cache
           </button>
+          {user?.role === 'super_user' && (
+            <button
+              onClick={() => setIsInvoiceModalOpen(true)}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+              aria-label="Generate invoice"
+            >
+              <FileTextIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Generate Invoice</span>
+              <span className="sm:hidden">Invoice</span>
+            </button>
+          )}
           <button
             onClick={handleExportPDF}
             disabled={isExporting || isLoading}
@@ -1462,6 +1660,122 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
           </div>
         </div>
       </div>
+
+      {/* Invoice Generation Modal */}
+      {isInvoiceModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <FileTextIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  Generate Invoice
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setIsInvoiceModalOpen(false)
+                  setInvoiceCustomerName('')
+                }}
+                disabled={isGeneratingInvoice}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <XIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-center">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  Generate an invoice for the current date range:
+                </p>
+                <p className="text-base font-semibold text-blue-900 dark:text-blue-100 mt-1">
+                  {
+                    (() => {
+                      const { start, end } = getDateRangeFromSelection(selectedDateRange, customStartDate, customEndDate)
+                      return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                    })()
+                  }
+                </p>
+                <p className="text-sm text-blue-600 dark:text-blue-300 mt-2">
+                  Total: <span className="font-bold">CAD ${(((metrics.totalCost || 0) + (metrics.totalSMSCost || 0)) * 1.45).toFixed(2)}</span> ({metrics.totalCalls || 0} calls, {metrics.totalMessages || 0} SMS)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Customer Name *
+                </label>
+                <input
+                  type="text"
+                  value={invoiceCustomerName}
+                  onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                  disabled={isGeneratingInvoice}
+                  placeholder="Enter customer name"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-100 disabled:opacity-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Customer Email *
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={invoiceCustomerEmail}
+                    disabled
+                    readOnly
+                    className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 cursor-not-allowed"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <LockIcon className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                  <LockIcon className="w-3 h-3" />
+                  Locked to elitesquadp@protonmail.com (testing)
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setIsInvoiceModalOpen(false)
+                  setInvoiceCustomerName('')
+                }}
+                disabled={isGeneratingInvoice}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateInvoice}
+                disabled={isGeneratingInvoice || !invoiceCustomerName.trim() || !invoiceCustomerEmail.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGeneratingInvoice ? (
+                  <>
+                    <RefreshCwIcon className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <FileTextIcon className="w-4 h-4" />
+                    Generate Invoice
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Site Help Chatbot */}
       <SiteHelpChatbot
