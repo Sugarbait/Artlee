@@ -711,12 +711,12 @@ export const CallsPage: React.FC<CallsPageProps> = ({ user }) => {
         doc.text(`Date: ${callDateTime.date} ${callDateTime.time}`, margin, yPosition)
         yPosition += 6
 
-        // Patient info
+        // Patient info - prioritize to_number (called number) over from_number (calling number)
         const phoneNumber = call.call_analysis?.custom_analysis_data?.phone_number ||
                            call.call_analysis?.custom_analysis_data?.customer_phone_number ||
                            call.metadata?.phone_number ||
-                           call.from_number ||
                            call.to_number ||
+                           call.from_number ||
                            'Unknown'
 
         // Get patient ID safely to avoid audit logging issues
@@ -1261,7 +1261,7 @@ export const CallsPage: React.FC<CallsPageProps> = ({ user }) => {
                               )}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {call.from_number || call.to_number || 'No phone number'}
+                              {call.to_number || call.from_number || 'No phone number'}
                             </div>
                           </div>
                         </div>
@@ -1321,7 +1321,7 @@ export const CallsPage: React.FC<CallsPageProps> = ({ user }) => {
                               )}
                             </div>
                             <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
-                              {call.from_number || call.to_number || 'No phone number'}
+                              {call.to_number || call.from_number || 'No phone number'}
                             </div>
                           </div>
                         </div>

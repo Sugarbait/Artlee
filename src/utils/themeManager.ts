@@ -34,17 +34,11 @@ export class ThemeManager {
 
   /**
    * Get the current theme from localStorage
+   * ARTLEE CRM: Always returns light mode
    */
   static getCurrentTheme(): Theme {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY)
-      if (stored && ['light', 'dark', 'auto'].includes(stored)) {
-        return stored as Theme
-      }
-    } catch (error) {
-      console.warn('Failed to get theme from localStorage:', error)
-    }
-    return 'light' // default
+    // ARTLEE CRM: Always force light mode
+    return 'light'
   }
 
   /**
@@ -60,12 +54,13 @@ export class ThemeManager {
 
   /**
    * Initialize theme system
-   * Loads saved theme or defaults to light mode
+   * ARTLEE CRM: Always defaults to light mode
    */
   static initialize(): void {
-    // Get saved theme or default to light
-    const theme = this.getCurrentTheme()
+    // ARTLEE CRM: Force light mode always
+    const theme = 'light'
     this.applyTheme(theme)
+    this.saveTheme(theme)
 
     // Force re-application to ensure persistence
     setTimeout(() => {
@@ -138,20 +133,16 @@ if (typeof window !== 'undefined') {
   ThemeManager.initialize()
 
   // Monitor DOM changes that might reset the theme
+  // ARTLEE CRM: Always enforce light mode
   if (typeof MutationObserver !== 'undefined') {
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-          const currentTheme = ThemeManager.getCurrentTheme()
-          const shouldHaveDark = currentTheme === 'dark' ||
-            (currentTheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
           const hasDark = document.documentElement.classList.contains('dark')
 
-          if (shouldHaveDark && !hasDark) {
-            console.log('Theme class was removed, reapplying dark mode')
-            document.documentElement.classList.add('dark')
-          } else if (!shouldHaveDark && hasDark) {
-            console.log('Theme class was added incorrectly, removing dark mode')
+          // ARTLEE CRM: Always remove dark mode if it's added
+          if (hasDark) {
+            console.log('ARTLEE: Dark mode detected, enforcing light mode')
             document.documentElement.classList.remove('dark')
           }
         }

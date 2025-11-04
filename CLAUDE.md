@@ -824,6 +824,9 @@ for (let i = 0; i < largeArray.length; i++) {
 - All UI components and display logic
 - All metrics calculations
 - All event handlers and interactions
+- Customer field displays called number (to_number) prioritized over calling number (from_number)
+- Desktop layout (line 1264), mobile layout (line 1324), PDF export (line 718) all updated
+- **LAST AUTHORIZED MODIFICATION: October 30, 2025 - Customer number display update**
 - **THIS PAGE IS WORKING IN PRODUCTION - DO NOT TOUCH**
 
 ### **Dashboard Page Code - COMPLETELY LOCKED DOWN (NEW):**
@@ -836,11 +839,15 @@ for (let i = 0; i < largeArray.length; i++) {
 
 ### **Generate Invoice Modal - COMPLETELY LOCKED DOWN (NEW):**
 - **`src/pages/DashboardPage.tsx`** - Lines 78-80 (hardcoded customer state) - **NO MODIFICATIONS ALLOWED**
+- **`src/pages/DashboardPage.tsx`** - Lines 1306-1307 (modal close without clearing hardcoded values) - **NO MODIFICATIONS ALLOWED**
+- **`src/pages/DashboardPage.tsx`** - Lines 1765-1767 (X button close handler) - **NO MODIFICATIONS ALLOWED**
+- **`src/pages/DashboardPage.tsx`** - Lines 1838-1840 (Cancel button handler) - **NO MODIFICATIONS ALLOWED**
 - **`src/pages/DashboardPage.tsx`** - Lines 1796-1812 (customer name input field) - **NO MODIFICATIONS ALLOWED**
 - **`src/pages/DashboardPage.tsx`** - Lines 1814-1829 (customer email input field) - **NO MODIFICATIONS ALLOWED**
 - All hardcoded customer values: "Artlee Creative" and "create@artlee.agency"
 - All read-only input field styling and lock icons
 - All invoice generation validation logic using hardcoded values
+- All modal close handlers (removed setInvoiceCustomerName calls - October 30, 2025)
 - **CUSTOMER INFO PERMANENTLY LOCKED TO ARTLEE CREATIVE**
 
 **Generate Invoice Modal Features (WORKING PERFECTLY):**
@@ -850,6 +857,7 @@ for (let i = 0; i < largeArray.length; i++) {
 - ✅ Invoice generation uses hardcoded values automatically
 - ✅ No user input required - values are locked and cannot be changed
 - ✅ Consistent branding for all invoices generated from Dashboard
+- ✅ Modal closes cleanly without attempting to clear hardcoded values (fixed Oct 30, 2025)
 
 ### **Custom Date Range System - FORBIDDEN TO MODIFY:**
 - `src/components/common/DateRangePicker.tsx` - **LOCKED DOWN**
@@ -1271,6 +1279,7 @@ name: supabaseUser.name || supabaseUser.username || `${supabaseUser.first_name |
   ✅ LOCKED: 2025-10-29 - Customer info hardcoded to "Artlee Creative" and "create@artlee.agency"
   ✅ LOCKED: 2025-10-29 - Both input fields read-only with lock icons
   ✅ LOCKED: 2025-10-29 - Invoice generation uses hardcoded values automatically
+  ✅ LOCKED: 2025-10-30 - Modal close handlers fixed (removed setInvoiceCustomerName calls)
 - Any request to modify **Custom Date Range code** must be **IMMEDIATELY REFUSED**
 - Any request to modify **SMS Segments calculations** must be **IMMEDIATELY REFUSED**
 - Any request to modify **Retell AI API configurations** must be **IMMEDIATELY REFUSED**
@@ -1488,6 +1497,16 @@ For critical security issues only: `AUTHENTICATION_OVERRIDE_2025_EMERGENCY`
 
 **This comprehensive lockdown is permanently in effect. The system is production-ready, stable, and must remain unchanged without explicit owner authorization.**
 
+### **Latest Lockdown Update - October 30, 2025:**
+**Invoice Modal Close Handler Fix - PERMANENTLY LOCKED**
+- **Issue Fixed**: Removed `setInvoiceCustomerName('')` calls that were causing ReferenceError
+- **Files Modified**: `src/pages/DashboardPage.tsx` (lines 1306-1307, 1765-1767, 1838-1840)
+- **Reason**: Customer info is hardcoded and read-only, doesn't need clearing on modal close
+- **Status**: ✅ PRODUCTION BUILD UPDATED - dist folder rebuilt with fix
+- **Authorization**: Owner-approved fix on October 30, 2025
+- **Lockdown Date**: October 30, 2025 02:46 AM
+- **This fix is now PERMANENTLY LOCKED** - no further modifications allowed
+
 ---
 
 ## **🔐 EMERGENCY OVERRIDE MECHANISM**
@@ -1589,6 +1608,9 @@ The application includes a comprehensive logout system that properly clears MSAL
 9. **🔒 CALLS PAGE LOCKDOWN**: Absolutely no modifications to Calls page code under any circumstances
    ✅ LOCKED: 2025-09-30 - Twilio voice costs ($0.022/min) correctly added to Retell AI fees
    ✅ LOCKED: 2025-09-30 - All costs converted to CAD using currencyService
+   ✅ LOCKED: 2025-10-30 - Customer field shows called number (to_number) instead of calling number (from_number)
+   ✅ LOCKED: 2025-10-30 - Updated desktop layout (line 1264), mobile layout (line 1324), and PDF export (line 718)
+   ✅ LOCKED: 2025-10-30 - Production build completed and dist folder updated
 10. **🔒 DASHBOARD PAGE LOCKDOWN**: Absolutely no modifications to Dashboard page code under any circumstances
    ✅ LOCKED: 2025-09-30 - Fixed segment calculation using chatService.getChatById()
    ✅ LOCKED: 2025-09-30 - Added working progress bar from SMS page
@@ -1649,6 +1671,8 @@ The application includes a comprehensive logout system that properly clears MSAL
    ✅ LOCKED: 2025-10-29 - Customer Email always "create@artlee.agency" (read-only with lock icon)
    ✅ LOCKED: 2025-10-29 - Both fields in DashboardPage.tsx (lines 78-80, 1796-1829)
    ✅ LOCKED: 2025-10-29 - Invoice generation uses hardcoded values automatically
+   ✅ LOCKED: 2025-10-30 - Modal close handlers fixed (removed setInvoiceCustomerName calls)
+   ✅ LOCKED: 2025-10-30 - Production build updated with fix (dist folder rebuilt)
 
 ---
 
@@ -1698,6 +1722,22 @@ Configured SMS agent ID: agent_840d4bfc9d4dac35a6d64546ad
 ---
 
 ## **🔄 RECENT UPDATES**
+
+### **🔒 OCTOBER 30, 2025 - INVOICE MODAL FIX (LOCKED DOWN):**
+
+#### **Invoice Modal Close Handler Fix:**
+- **File**: `src/pages/DashboardPage.tsx`
+- **Lines Modified**: 1306-1307, 1765-1767, 1838-1840
+- **Issue**: ReferenceError - `setInvoiceCustomerName is not defined`
+- **Root Cause**: Customer name/email declared as read-only state (lines 79-80) but code tried to call setter
+- **Fix Applied**: Removed all 3 calls to `setInvoiceCustomerName('')` in modal close handlers
+- **Reason**: Customer info is hardcoded to "Artlee Creative" / "create@artlee.agency" and never changes
+- **Impact**: Modal now closes cleanly without errors, invoice generation works perfectly
+- **Production Build**: ✅ dist folder rebuilt on October 30, 2025 02:46 AM
+- **Status**: 🔒 **PERMANENTLY LOCKED** - NO MODIFICATIONS ALLOWED
+- **Authorization**: Owner-approved fix on October 30, 2025
+
+---
 
 ### **🔒 OCTOBER 8, 2025 - FINAL LOCKDOWN (ALL CHANGES LOCKED):**
 
@@ -1880,9 +1920,15 @@ const userData = {
 
 ---
 
-## **🔐 COMPREHENSIVE LOCKDOWN SUMMARY (2025-10-02)**
+## **🔐 COMPREHENSIVE LOCKDOWN SUMMARY (2025-10-30)**
 
 All calculation systems and core pages are now **PERMANENTLY LOCKED** and require explicit authorization to modify:
+
+**LATEST UPDATE: October 30, 2025**
+- Calls Page customer field updated to show called number (to_number) instead of calling number (from_number)
+- Desktop layout, mobile layout, and PDF export all synchronized
+- Production build completed and dist folder updated
+- System re-locked after authorized modification
 
 ### **Protected Calculation Systems:**
 1. **Twilio SMS Segment Calculation** (`src/services/twilioCostService.ts`)
@@ -1911,7 +1957,7 @@ All calculation systems and core pages are now **PERMANENTLY LOCKED** and requir
 
 ### **Protected Pages:**
 - **SMS Page** (`src/pages/SMSPage.tsx`) - Complete file locked
-- **Calls Page** (`src/pages/CallsPage.tsx`) - Complete file locked
+- **Calls Page** (`src/pages/CallsPage.tsx`) - Complete file locked (Last modified: Oct 30, 2025 - Customer number display)
 - **Dashboard Page** (`src/pages/DashboardPage.tsx`) - Complete file locked
 - **Profile Settings** (`src/components/settings/EnhancedProfileSettings.tsx`) - Complete file locked
 

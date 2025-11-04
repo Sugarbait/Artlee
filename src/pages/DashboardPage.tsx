@@ -6,6 +6,7 @@ import { retellService, currencyService, twilioCostService, chatService } from '
 import { pdfExportService } from '@/services/pdfExportService'
 import { userSettingsService } from '@/services'
 import { SiteHelpChatbot } from '@/components/common/SiteHelpChatbot'
+import { ParticleBackground } from '@/components/ui/ParticleBackground'
 import { stripeInvoiceService } from '@/services/stripeInvoiceService'
 import { invoiceEmailService } from '@/services/invoiceEmailService'
 import { generalToast } from '@/services/generalToastService'
@@ -1303,8 +1304,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
         console.log('📧 Email data being sent:', emailData)
         const emailResult = await invoiceEmailService.sendInvoiceEmail(emailData)
 
-        // Clear form and close modal
-        setInvoiceCustomerName('')
+        // Close modal (customer info is hardcoded and doesn't need clearing)
         setIsInvoiceModalOpen(false)
 
         // Show success message based on email result
@@ -1442,49 +1442,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
         </div>
       )}
 
-      {/* Combined Service Cost Card */}
-      <div className="mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
-            {/* Left: Call Costs */}
-            <div className="text-center lg:text-left">
-              <div className="flex items-center justify-center lg:justify-start gap-2 mb-2">
-                <PhoneIcon className="w-5 h-5 text-blue-600" />
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Call Costs</span>
+      {/* Combined Service Cost Card - Animated */}
+      <div className="mb-6 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg relative overflow-hidden">
+        <ParticleBackground />
+        <div className="p-6 lg:p-8 relative z-10">
+          <div className="text-center">
+            <p className="text-white/80 text-base lg:text-lg mb-2">
+              Total Service Cost
+            </p>
+            <p className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-4 md:mb-6 numeric-data" style={{ textShadow: '0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)' }}>
+              ${isLoading ? '...' : (((metrics.totalCost || 0) + (metrics.totalSMSCost || 0)) * 1.45).toFixed(2)} CAD
+            </p>
+            <div className="grid grid-cols-2 md:flex md:items-center md:justify-center gap-4 md:gap-6 lg:gap-8 text-white/90">
+              <div>
+                <p className="text-xs md:text-sm opacity-75">Calls</p>
+                <p className="text-base md:text-lg lg:text-xl font-bold numeric-data">${isLoading ? '...' : ((metrics.totalCost || 0) * 1.45).toFixed(2)}</p>
+                <p className="text-xs opacity-60 numeric-data">{metrics.totalCalls} calls</p>
               </div>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 numeric-data">
-                ${isLoading ? '...' : ((metrics.totalCost || 0) * 1.45).toFixed(2)}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                <span className="numeric-data">{metrics.totalCalls}</span> calls
-              </div>
-            </div>
-
-            {/* Center: Total Combined Cost */}
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <DollarSignIcon className="w-6 h-6 text-green-600" />
-                <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Combined Service Cost</span>
-              </div>
-              <div className="text-5xl font-black text-green-600 dark:text-green-400 mb-2 numeric-data">
-                CAD ${isLoading ? '...' : (((metrics.totalCost || 0) + (metrics.totalSMSCost || 0)) * 1.45).toFixed(2)}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Total for selected date range
-              </div>
-            </div>
-
-            {/* Right: SMS Costs */}
-            <div className="text-center lg:text-right">
-              <div className="flex items-center justify-center lg:justify-end gap-2 mb-2">
-                <MessageSquareIcon className="w-5 h-5 text-purple-600" />
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">SMS Costs</span>
-              </div>
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 numeric-data">
-                ${isLoading ? '...' : ((metrics.totalSMSCost || 0) * 1.45).toFixed(2)}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                <span className="numeric-data">{metrics.totalMessages}</span> conversations
+              <div className="hidden md:block w-px h-12 bg-white/30"></div>
+              <div>
+                <p className="text-xs md:text-sm opacity-75">SMS</p>
+                <p className="text-base md:text-lg lg:text-xl font-bold numeric-data">${isLoading ? '...' : ((metrics.totalSMSCost || 0) * 1.45).toFixed(2)}</p>
+                <p className="text-xs opacity-60 numeric-data">{metrics.totalMessages} conversations</p>
               </div>
             </div>
           </div>
@@ -1750,8 +1729,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
 
       {/* Invoice Generation Modal */}
       {isInvoiceModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
@@ -1765,7 +1744,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
               <button
                 onClick={() => {
                   setIsInvoiceModalOpen(false)
-                  setInvoiceCustomerName('')
                 }}
                 disabled={isGeneratingInvoice}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
@@ -1829,7 +1807,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
                   <LockIcon className="w-3 h-3" />
-                  Locked to elitesquadp@protonmail.com (testing)
+                  Locked to create@artlee.agency
                 </p>
               </div>
             </div>
@@ -1839,7 +1817,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ user }) => {
               <button
                 onClick={() => {
                   setIsInvoiceModalOpen(false)
-                  setInvoiceCustomerName('')
                 }}
                 disabled={isGeneratingInvoice}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
