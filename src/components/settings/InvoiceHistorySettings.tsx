@@ -302,13 +302,19 @@ const InvoiceHistorySettings: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-600 rounded-lg p-4">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-600 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <DollarSign className="w-8 h-8 text-green-600" />
+            <DollarSign className="w-8 h-8 text-yellow-600" />
             <div>
-              <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+              <div className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
                 {invoices.length > 0
                   ? invoices.reduce((sum, inv) => {
+                      // Only include unpaid invoices
+                      const status = inv.invoice_status?.toLowerCase()
+                      const isPaid = inv.paid_at || status === 'paid'
+
+                      if (isPaid) return sum
+
                       // Try to get amount from different fields
                       const amountStr = inv.amount || `${inv.total_cost_cad || 0}`
                       const amount = parseFloat(amountStr.toString().replace(/[^0-9.-]+/g, ''))
@@ -316,7 +322,7 @@ const InvoiceHistorySettings: React.FC = () => {
                     }, 0).toFixed(2)
                   : '0.00'}
               </div>
-              <div className="text-xs text-green-700 dark:text-green-300">Total Amount (CAD)</div>
+              <div className="text-xs text-yellow-700 dark:text-yellow-300">Unpaid Amount (CAD)</div>
             </div>
           </div>
         </div>
