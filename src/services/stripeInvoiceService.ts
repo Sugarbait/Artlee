@@ -414,8 +414,8 @@ class StripeInvoiceService {
         collection_method: 'send_invoice',
         days_until_due: options.dueDate
           ? Math.ceil((options.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-          : 30,
-        description: `CareXPS Services - ${options.dateRange.label || invoiceData.dateRange.label}`,
+          : 7,
+        description: `Artlee Services - ${options.dateRange.label || invoiceData.dateRange.label}`,
         metadata: {
           service: 'CareXPS Business Platform CRM',
           date_range_start: options.dateRange.start.toISOString(),

@@ -271,7 +271,7 @@ class RetellService {
   /**
    * Load credentials from current user localStorage
    */
-  private loadFromCurrentUser(): {apiKey: string, callAgentId: string, smsAgentId: string} {
+  private loadFromCurrentUser(): { apiKey: string, callAgentId: string, smsAgentId: string } {
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
       if (currentUser.id) {
@@ -289,13 +289,13 @@ class RetellService {
     } catch (error) {
       console.warn('Retell AI - Error loading from currentUser:', error)
     }
-    return {apiKey: '', callAgentId: '', smsAgentId: ''}
+    return { apiKey: '', callAgentId: '', smsAgentId: '' }
   }
 
   /**
    * Scan all user settings files for API keys
    */
-  private scanAllUserSettings(): {apiKey: string, callAgentId: string, smsAgentId: string} {
+  private scanAllUserSettings(): { apiKey: string, callAgentId: string, smsAgentId: string } {
     try {
       console.log('🔍 RetellService - Scanning all user settings for credentials...')
       const allKeys = Object.keys(localStorage)
@@ -319,13 +319,13 @@ class RetellService {
     } catch (error) {
       console.warn('RetellService - Error scanning user settings:', error)
     }
-    return {apiKey: '', callAgentId: '', smsAgentId: ''}
+    return { apiKey: '', callAgentId: '', smsAgentId: '' }
   }
 
   /**
    * Load credentials from sessionStorage backup
    */
-  private loadFromSessionStorage(): {apiKey: string, callAgentId: string, smsAgentId: string} {
+  private loadFromSessionStorage(): { apiKey: string, callAgentId: string, smsAgentId: string } {
     try {
       const sessionData = sessionStorage.getItem('retell_credentials_backup')
       if (sessionData) {
@@ -338,13 +338,13 @@ class RetellService {
     } catch (error) {
       console.warn('RetellService - Error loading from sessionStorage:', error)
     }
-    return {apiKey: '', callAgentId: '', smsAgentId: ''}
+    return { apiKey: '', callAgentId: '', smsAgentId: '' }
   }
 
   /**
    * Load credentials from in-memory backup
    */
-  private loadFromMemoryBackup(): {apiKey: string, callAgentId: string, smsAgentId: string} {
+  private loadFromMemoryBackup(): { apiKey: string, callAgentId: string, smsAgentId: string } {
     try {
       const backup = (window as any).__retellCredentialsBackup
       if (backup && backup.apiKey) {
@@ -354,13 +354,13 @@ class RetellService {
     } catch (error) {
       console.warn('RetellService - Error loading from memory backup:', error)
     }
-    return {apiKey: '', callAgentId: '', smsAgentId: ''}
+    return { apiKey: '', callAgentId: '', smsAgentId: '' }
   }
 
   /**
    * Load hardcoded credentials as ultimate fallback
    */
-  private loadHardcodedCredentials(): {apiKey: string, callAgentId: string, smsAgentId: string} {
+  private loadHardcodedCredentials(): { apiKey: string, callAgentId: string, smsAgentId: string } {
     try {
       console.log('🔐 RetellService - Loading hardcoded credentials as ultimate fallback...')
       const bulletproofCreds = getBulletproofCredentials()
@@ -382,7 +382,7 @@ class RetellService {
     } catch (error) {
       console.error('❌ RetellService - Error loading hardcoded credentials:', error)
     }
-    return {apiKey: '', callAgentId: '', smsAgentId: ''}
+    return { apiKey: '', callAgentId: '', smsAgentId: '' }
   }
 
   /**
@@ -626,7 +626,11 @@ class RetellService {
    * The API ignores the agent_id parameter and returns ALL chats from the entire account.
    * We must filter client-side after receiving the response.
    */
-  public async getChatHistory(): Promise<ChatListResponse> {
+  public async getChatHistory(options: {
+    limit?: number
+    agent_id?: string
+    pagination_key?: string
+  } = {}): Promise<ChatListResponse> {
     try {
       console.log('Fresh RetellService - Fetching chats...')
 
@@ -636,24 +640,26 @@ class RetellService {
 
       // Use the correct GET /list-chat endpoint
       // NOTE: The API does NOT support agent_id filtering - we'll filter client-side
-      let url = `${this.baseUrl}/list-chat`
+      const url = new URL(`${this.baseUrl}/list-chat`)
 
-      // Add limit parameter only
-      const params = new URLSearchParams()
-      params.append('limit', '1000')
-
-      if (params.toString()) {
-        url += `?${params.toString()}`
+      // Add supported query parameters
+      if (options.limit) {
+        url.searchParams.append('limit', options.limit.toString())
+      }
+      if (options.pagination_key) {
+        url.searchParams.append('pagination_key', options.pagination_key)
       }
 
+      // NOTE: Do NOT append 'agent_id' here. The API does not accept it.
+
       console.log('Fresh RetellService - Chat request:', {
-        url: url,
+        url: url.toString(),
         method: 'GET',
         note: 'API does not support agent_id filtering - will filter client-side'
       })
 
       const headers = await this.getHeaders()
-      const response = await fetch(url, {
+      const response = await fetch(url.toString(), {
         method: 'GET',
         headers
       })
@@ -883,10 +889,10 @@ class RetellService {
     }
 
     if (typeof window !== 'undefined') {
-      window.removeEventListener('popstate', () => {})
-      window.removeEventListener('pushstate', () => {})
-      window.removeEventListener('replacestate', () => {})
-      window.removeEventListener('focus', () => {})
+      window.removeEventListener('popstate', () => { })
+      window.removeEventListener('pushstate', () => { })
+      window.removeEventListener('replacestate', () => { })
+      window.removeEventListener('focus', () => { })
     }
   }
 

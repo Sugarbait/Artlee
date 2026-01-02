@@ -46,9 +46,9 @@ import { patientIdService } from '@/services/patientIdService'
 
 // CRITICAL FIX: Disable console logging in production to prevent infinite loops
 const isProduction = !import.meta.env.DEV
-const safeLog = isProduction ? () => {} : console.log
-const safeWarn = isProduction ? () => {} : console.warn
-const safeError = isProduction ? () => {} : console.error
+const safeLog = isProduction ? () => { } : console.log
+const safeWarn = isProduction ? () => { } : console.warn
+const safeError = isProduction ? () => { } : console.error
 
 // ==================================================================================
 // 🔒 LOCKED CODE: SMS SEGMENT CACHE UTILITIES - PRODUCTION READY - NO MODIFICATIONS
@@ -1147,7 +1147,7 @@ export const SMSPage: React.FC<SMSPageProps> = ({ user }) => {
         // Fetch chats using standard service - same pattern as Calls page
         console.log('🚀 [SMSPage] Making API call to fetch chats...')
         allChatsResponse = await chatService.getChatHistory({
-          limit: 2000, // Increased limit to handle full year range data
+          limit: 1000, // CHANGED from 2000 to 1000
           sort_order: 'descending'
         })
         console.log('✅ [SMSPage] Successfully fetched chats from API:', {
@@ -1334,8 +1334,8 @@ export const SMSPage: React.FC<SMSPageProps> = ({ user }) => {
   // Fetch when debounced filters change - defined after debouncedFetchChats
   useEffect(() => {
     if (debouncedSearchTerm !== searchTerm ||
-        debouncedStatusFilter !== statusFilter ||
-        debouncedSentimentFilter !== sentimentFilter) {
+      debouncedStatusFilter !== statusFilter ||
+      debouncedSentimentFilter !== sentimentFilter) {
       return // Wait for debouncing to complete
     }
     setCurrentPage(1)
@@ -1541,10 +1541,10 @@ export const SMSPage: React.FC<SMSPageProps> = ({ user }) => {
 
         // Patient info
         const phoneNumber = chat.chat_analysis?.custom_analysis_data?.phone_number ||
-                           chat.chat_analysis?.custom_analysis_data?.customer_phone_number ||
-                           chat.metadata?.phone_number ||
-                           chat.phone_number ||
-                           'Unknown'
+          chat.chat_analysis?.custom_analysis_data?.customer_phone_number ||
+          chat.metadata?.phone_number ||
+          chat.phone_number ||
+          'Unknown'
 
         // Get patient ID safely to avoid audit logging issues
         let patientId = 'PT00000000'
@@ -2338,436 +2338,433 @@ export const SMSPage: React.FC<SMSPageProps> = ({ user }) => {
         </div>
       )}
 
-        {/* Chat Conversations List */}
-        <div>
-            {/* Search and Filters */}
-            <div className="mb-4 sm:mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 lg:p-6">
-              <div className="flex flex-col gap-3 sm:gap-4">
-                <div className="flex-1 relative">
-                  <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                  <input
-                    type="search"
-                    placeholder="Search chats by phone number, patient name, or content..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px] text-sm sm:text-base touch-manipulation"
-                  />
-                  <button
-                    onClick={() => setIsFuzzySearchEnabled(!isFuzzySearchEnabled)}
-                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded transition-colors ${
-                      isFuzzySearchEnabled
-                        ? 'text-blue-600 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/20'
-                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                    }`}
-                    title={isFuzzySearchEnabled ? 'Fuzzy search enabled - click to disable' : 'Basic search - click to enable fuzzy search'}
-                  >
-                    <ZapIcon className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] text-sm sm:text-base flex-1 sm:min-w-[120px] touch-manipulation"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="ended">Ended</option>
-                    <option value="error">Error</option>
-                  </select>
-                  <select
-                    value={sentimentFilter}
-                    onChange={(e) => setSentimentFilter(e.target.value)}
-                    className="px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] text-sm sm:text-base flex-1 sm:min-w-[130px] touch-manipulation"
-                  >
-                    <option value="all">All Sentiment</option>
-                    <option value="positive">Positive</option>
-                    <option value="neutral">Neutral</option>
-                    <option value="negative">Negative</option>
-                  </select>
+      {/* Chat Conversations List */}
+      <div>
+        {/* Search and Filters */}
+        <div className="mb-4 sm:mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5 lg:p-6">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="flex-1 relative">
+              <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <input
+                type="search"
+                placeholder="Search chats by phone number, patient name, or content..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px] text-sm sm:text-base touch-manipulation"
+              />
+              <button
+                onClick={() => setIsFuzzySearchEnabled(!isFuzzySearchEnabled)}
+                className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded transition-colors ${isFuzzySearchEnabled
+                    ? 'text-blue-600 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/20'
+                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                  }`}
+                title={isFuzzySearchEnabled ? 'Fuzzy search enabled - click to disable' : 'Basic search - click to enable fuzzy search'}
+              >
+                <ZapIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] text-sm sm:text-base flex-1 sm:min-w-[120px] touch-manipulation"
+              >
+                <option value="all">All Status</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="ended">Ended</option>
+                <option value="error">Error</option>
+              </select>
+              <select
+                value={sentimentFilter}
+                onChange={(e) => setSentimentFilter(e.target.value)}
+                className="px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] text-sm sm:text-base flex-1 sm:min-w-[130px] touch-manipulation"
+              >
+                <option value="all">All Sentiment</option>
+                <option value="positive">Positive</option>
+                <option value="neutral">Neutral</option>
+                <option value="negative">Negative</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Conversations Table */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {loading ? (
+            <div className="text-center py-8 sm:py-12">
+              <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-3 sm:mt-4 text-sm sm:text-base">Loading chat conversations...</p>
+            </div>
+          ) : filteredChats.length > 0 ? (
+            <div className="overflow-x-auto">
+              {/* Table Header */}
+              <div className="bg-gray-50 border-b border-gray-200 px-4 sm:px-6 py-3 hidden lg:block">
+                <div className="grid grid-cols-12 gap-2 lg:gap-4 text-xs sm:text-sm font-medium text-gray-700">
+                  <div className="col-span-1">#</div>
+                  <div className="col-span-3">Patient</div>
+                  <div className="col-span-3">Chat Info</div>
+                  <div className="col-span-2">Cost</div>
+                  <div className="col-span-2">Status & Duration</div>
+                  <div className="col-span-1">Actions</div>
                 </div>
               </div>
-            </div>
 
-            {/* Chat Conversations Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              {loading ? (
-                <div className="text-center py-8 sm:py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-gray-600 mt-3 sm:mt-4 text-sm sm:text-base">Loading chat conversations...</p>
-                </div>
-              ) : filteredChats.length > 0 ? (
-                <div className="overflow-x-auto">
-                  {/* Table Header */}
-                  <div className="bg-gray-50 border-b border-gray-200 px-4 sm:px-6 py-3 hidden lg:block">
-                    <div className="grid grid-cols-12 gap-2 lg:gap-4 text-xs sm:text-sm font-medium text-gray-700">
-                      <div className="col-span-1">#</div>
-                      <div className="col-span-3">Patient</div>
-                      <div className="col-span-3">Chat Info</div>
-                      <div className="col-span-2">Cost</div>
-                      <div className="col-span-2">Status & Duration</div>
-                      <div className="col-span-1">Actions</div>
-                    </div>
-                  </div>
+              {/* Table Rows */}
+              <div className="divide-y divide-gray-200">
+                {filteredChats.map((chat, index) => {
+                  // Calculate the actual row number based on current page and pagination
+                  const rowNumber = (currentPage - 1) * recordsPerPage + index + 1
+                  // Determine if this row should have gray background (even rows)
+                  const isEvenRow = index % 2 === 0
+                  const rowBgColor = isEvenRow ? 'bg-white' : 'bg-gray-25'
+                  // Check all possible phone number fields - prioritize analysis data
+                  const phoneNumber = chat.chat_analysis?.custom_analysis_data?.phone_number ||
+                    chat.chat_analysis?.custom_analysis_data?.customer_phone_number ||
+                    chat.chat_analysis?.custom_analysis_data?.phone ||
+                    chat.chat_analysis?.custom_analysis_data?.contact_number ||
+                    chat.metadata?.phone_number ||
+                    chat.metadata?.customer_phone_number ||
+                    chat.metadata?.from_phone_number ||
+                    chat.metadata?.to_phone_number ||
+                    chat.metadata?.phone ||
+                    chat.collected_dynamic_variables?.phone_number ||
+                    chat.collected_dynamic_variables?.customer_phone_number ||
+                    ''
 
-                  {/* Table Rows */}
-                  <div className="divide-y divide-gray-200">
-                    {filteredChats.map((chat, index) => {
-                      // Calculate the actual row number based on current page and pagination
-                      const rowNumber = (currentPage - 1) * recordsPerPage + index + 1
-                      // Determine if this row should have gray background (even rows)
-                      const isEvenRow = index % 2 === 0
-                      const rowBgColor = isEvenRow ? 'bg-white' : 'bg-gray-25'
-                      // Check all possible phone number fields - prioritize analysis data
-                      const phoneNumber = chat.chat_analysis?.custom_analysis_data?.phone_number ||
-                                        chat.chat_analysis?.custom_analysis_data?.customer_phone_number ||
-                                        chat.chat_analysis?.custom_analysis_data?.phone ||
-                                        chat.chat_analysis?.custom_analysis_data?.contact_number ||
-                                        chat.metadata?.phone_number ||
-                                        chat.metadata?.customer_phone_number ||
-                                        chat.metadata?.from_phone_number ||
-                                        chat.metadata?.to_phone_number ||
-                                        chat.metadata?.phone ||
-                                        chat.collected_dynamic_variables?.phone_number ||
-                                        chat.collected_dynamic_variables?.customer_phone_number ||
-                                        ''
+                  // Try multiple approaches to extract name - check analysis data first
+                  const extractedName = chat.chat_analysis?.custom_analysis_data?.patient_name ||
+                    chat.chat_analysis?.custom_analysis_data?.caller_name ||
+                    chat.chat_analysis?.custom_analysis_data?.customer_name ||
+                    chat.chat_analysis?.custom_analysis_data?.name ||
+                    chat.metadata?.patient_name ||
+                    chat.metadata?.customer_name ||
+                    chat.metadata?.caller_name ||
+                    chat.metadata?.name ||
+                    chat.metadata?.first_name ||
+                    chat.metadata?.last_name ||
+                    chat.collected_dynamic_variables?.patient_name ||
+                    chat.collected_dynamic_variables?.customer_name ||
+                    chat.collected_dynamic_variables?.caller_name ||
+                    chat.collected_dynamic_variables?.name ||
+                    chat.collected_dynamic_variables?.first_name ||
+                    chat.collected_dynamic_variables?.last_name ||
+                    null
 
-                      // Try multiple approaches to extract name - check analysis data first
-                      const extractedName = chat.chat_analysis?.custom_analysis_data?.patient_name ||
-                                          chat.chat_analysis?.custom_analysis_data?.caller_name ||
-                                          chat.chat_analysis?.custom_analysis_data?.customer_name ||
-                                          chat.chat_analysis?.custom_analysis_data?.name ||
-                                          chat.metadata?.patient_name ||
-                                          chat.metadata?.customer_name ||
-                                          chat.metadata?.caller_name ||
-                                          chat.metadata?.name ||
-                                          chat.metadata?.first_name ||
-                                          chat.metadata?.last_name ||
-                                          chat.collected_dynamic_variables?.patient_name ||
-                                          chat.collected_dynamic_variables?.customer_name ||
-                                          chat.collected_dynamic_variables?.caller_name ||
-                                          chat.collected_dynamic_variables?.name ||
-                                          chat.collected_dynamic_variables?.first_name ||
-                                          chat.collected_dynamic_variables?.last_name ||
-                                          null
+                  // Create a better fallback name
+                  let patientName = extractedName
+                  if (!patientName) {
+                    if (phoneNumber) {
+                      // Format phone number nicely if we have it
+                      const last4 = phoneNumber.replace(/\D/g, '').slice(-4)
+                      patientName = `Patient (${last4 ? '***-' + last4 : phoneNumber})`
+                    } else {
+                      // Use a portion of chat ID as last resort
+                      patientName = `Patient #${chat.chat_id.slice(0, 6)}`
+                    }
+                  }
 
-                      // Create a better fallback name
-                      let patientName = extractedName
-                      if (!patientName) {
-                        if (phoneNumber) {
-                          // Format phone number nicely if we have it
-                          const last4 = phoneNumber.replace(/\D/g, '').slice(-4)
-                          patientName = `Patient (${last4 ? '***-' + last4 : phoneNumber})`
-                        } else {
-                          // Use a portion of chat ID as last resort
-                          patientName = `Patient #${chat.chat_id.slice(0, 6)}`
-                        }
-                      }
+                  return (
+                    <div
+                      key={chat.chat_id}
+                      className={`px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hover:bg-blue-50 cursor-pointer transition-colors touch-manipulation ${rowBgColor}`}
+                      onClick={() => {
+                        setSelectedChat(chat)
+                        setIsChatDetailModalOpen(true)
+                      }}
+                    >
+                      {/* Desktop Layout */}
+                      <div className="hidden lg:grid grid-cols-12 gap-2 lg:gap-4 items-center">
+                        {/* Row Number */}
+                        <div className="col-span-1">
+                          <span className="text-xs lg:text-sm font-medium text-gray-500">#{rowNumber}</span>
+                        </div>
 
-                      return (
-                        <div
-                          key={chat.chat_id}
-                          className={`px-3 sm:px-4 lg:px-6 py-3 sm:py-4 hover:bg-blue-50 cursor-pointer transition-colors touch-manipulation ${rowBgColor}`}
-                          onClick={() => {
-                            setSelectedChat(chat)
-                            setIsChatDetailModalOpen(true)
-                          }}
-                        >
-                          {/* Desktop Layout */}
-                          <div className="hidden lg:grid grid-cols-12 gap-2 lg:gap-4 items-center">
-                            {/* Row Number */}
-                            <div className="col-span-1">
-                              <span className="text-xs lg:text-sm font-medium text-gray-500">#{rowNumber}</span>
-                            </div>
-
-                            {/* Patient Info */}
-                            <div className="col-span-3">
-                              <div>
-                                <div className="font-medium text-sm lg:text-base text-gray-900 flex items-center gap-2">
-                                  {patientName}
-                                  {hasNotes(chat.chat_id) && (
-                                    <div className="flex items-center gap-1">
-                                      <StickyNoteIcon className="h-4 w-4 text-blue-500" />
-                                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                                        {getNoteCount(chat.chat_id)}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="text-xs lg:text-sm text-gray-500">
-                                  {phoneNumber || 'No phone number'}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Chat Info */}
-                            <div className="col-span-3">
-                              <div className="text-xs lg:text-sm text-gray-900">
-                                {formatDateTime(chat.start_timestamp).date}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {formatDateTime(chat.start_timestamp).time}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                {chat.chat_analysis?.user_sentiment && (
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSentimentColor(chat.chat_analysis.user_sentiment)}`}>
-                                    {chat.chat_analysis.user_sentiment}
+                        {/* Patient Info */}
+                        <div className="col-span-3">
+                          <div>
+                            <div className="font-medium text-sm lg:text-base text-gray-900 flex items-center gap-2">
+                              {patientName}
+                              {hasNotes(chat.chat_id) && (
+                                <div className="flex items-center gap-1">
+                                  <StickyNoteIcon className="h-4 w-4 text-blue-500" />
+                                  <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                    {getNoteCount(chat.chat_id)}
                                   </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Cost */}
-                            <div className="col-span-2">
-                              <div className="text-xs lg:text-sm font-medium text-gray-900">
-                                <CostDisplay chat={chat} />
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                SMS cost
-                              </div>
-                            </div>
-
-                            {/* Status & Duration */}
-                            <div className="col-span-2">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getChatStatusColor(chat.chat_status)}`}>
-                                  {chat.chat_status}
-                                </span>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {formatDuration(chat.start_timestamp, chat.end_timestamp)}
-                              </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="col-span-1">
-                              <div className="flex items-center gap-1">
-                                <button
-                                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedChat(chat)
-                                    setIsChatDetailModalOpen(true)
-                                  }}
-                                  title="View Details"
-                                >
-                                  <EyeIcon className="w-4 h-4 text-gray-500" />
-                                </button>
-                                {chat.chat_status === 'ongoing' && (
-                                  <button
-                                    className="p-1 hover:bg-red-200 rounded transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      endChat(chat.chat_id)
-                                    }}
-                                    title="End Chat"
-                                  >
-                                    <StopCircleIcon className="w-4 h-4 text-red-500" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Mobile and Tablet Layout */}
-                          <div className="lg:hidden space-y-2 sm:space-y-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                  chat.chat_status === 'ongoing' ? 'bg-blue-100' :
-                                  chat.chat_status === 'ended' ? 'bg-green-100' : 'bg-red-100'
-                                }`}>
-                                  {chat.chat_status === 'ongoing' ?
-                                    <BotIcon className="w-5 h-5 text-blue-600" /> :
-                                    chat.chat_status === 'ended' ?
-                                    <CheckCircleIcon className="w-5 h-5 text-green-600" /> :
-                                    <AlertCircleIcon className="w-5 h-5 text-red-600" />
-                                  }
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-semibold text-sm sm:text-base text-gray-900 truncate">
-                                    {patientName}
-                                    {hasNotes(chat.chat_id) && (
-                                      <span className="ml-2 inline-flex items-center gap-1">
-                                        <StickyNoteIcon className="h-3 w-3 text-blue-500" />
-                                        <span className="text-xs text-blue-600 font-medium">
-                                          {getNoteCount(chat.chat_id)}
-                                        </span>
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-xs sm:text-sm text-gray-500 truncate">
-                                    {phoneNumber || 'No phone number'}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                {chat.chat_status === 'ongoing' && (
-                                  <button
-                                    className="p-2 hover:bg-red-200 rounded transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      endChat(chat.chat_id)
-                                    }}
-                                  >
-                                    <StopCircleIcon className="w-4 h-4 text-red-500" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="bg-gray-50 rounded p-2 sm:p-3">
-                              <p className="text-sm text-gray-900 line-clamp-2">
-                                {chat.transcript || 'No conversation yet'}
-                              </p>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getChatStatusColor(chat.chat_status)}`}>
-                                {chat.chat_status}
-                              </span>
-                              {chat.chat_analysis?.user_sentiment && (
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSentimentColor(chat.chat_analysis.user_sentiment)}`}>
-                                  {chat.chat_analysis.user_sentiment}
-                                </span>
                               )}
-                              <span className="text-gray-500">
-                                {formatDateTime(chat.start_timestamp).date} {formatDateTime(chat.start_timestamp).time}
-                              </span>
-                              <span className="text-gray-500">
-                                {chat.message_with_tool_calls?.length || 0} msgs
-                              </span>
-                              <span className="text-green-600 font-medium">
-                                <CostDisplay chat={chat} />
-                              </span>
+                            </div>
+                            <div className="text-xs lg:text-sm text-gray-500">
+                              {phoneNumber || 'No phone number'}
                             </div>
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12 sm:py-16">
-                  <MessageCircleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                  <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">No chat conversations found</h3>
-                  <p className="text-sm sm:text-base text-gray-600">No chat conversations have been started yet.</p>
-                </div>
-              )}
-            </div>
-          </div>
 
-        {/* Pagination */}
-        {filteredChatsCount > recordsPerPage && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 mt-4 sm:mt-6 lg:mt-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
-            <div className="flex items-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 text-center sm:text-left">
-              <span>
-                Showing {((currentPage - 1) * recordsPerPage) + 1} to {Math.min(currentPage * recordsPerPage, filteredChatsCount)} of {filteredChatsCount} chats
-              </span>
-            </div>
-            <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap justify-center">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
-              >
-                Previous
-              </button>
+                        {/* Chat Info */}
+                        <div className="col-span-3">
+                          <div className="text-xs lg:text-sm text-gray-900">
+                            {formatDateTime(chat.start_timestamp).date}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDateTime(chat.start_timestamp).time}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            {chat.chat_analysis?.user_sentiment && (
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSentimentColor(chat.chat_analysis.user_sentiment)}`}>
+                                {chat.chat_analysis.user_sentiment}
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-              {/* Page Numbers */}
-              <div className="flex items-center space-x-1">
-                {(() => {
-                  const totalPages = Math.ceil(filteredChatsCount / recordsPerPage)
-                  const pages = []
-                  const startPage = Math.max(1, currentPage - 2)
-                  const endPage = Math.min(totalPages, currentPage + 2)
+                        {/* Cost */}
+                        <div className="col-span-2">
+                          <div className="text-xs lg:text-sm font-medium text-gray-900">
+                            <CostDisplay chat={chat} />
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            SMS cost
+                          </div>
+                        </div>
 
-                  // First page
-                  if (startPage > 1) {
-                    pages.push(
-                      <button
-                        key={1}
-                        onClick={() => setCurrentPage(1)}
-                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
-                      >
-                        1
-                      </button>
-                    )
-                    if (startPage > 2) {
-                      pages.push(<span key="ellipsis1" className="px-2 text-gray-500 dark:text-gray-400">...</span>)
-                    }
-                  }
+                        {/* Status & Duration */}
+                        <div className="col-span-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getChatStatusColor(chat.chat_status)}`}>
+                              {chat.chat_status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDuration(chat.start_timestamp, chat.end_timestamp)}
+                          </div>
+                        </div>
 
-                  // Current page range
-                  for (let i = startPage; i <= endPage; i++) {
-                    pages.push(
-                      <button
-                        key={i}
-                        onClick={() => setCurrentPage(i)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg ${
-                          i === currentPage
-                            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-600'
-                            : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {i}
-                      </button>
-                    )
-                  }
+                        {/* Actions */}
+                        <div className="col-span-1">
+                          <div className="flex items-center gap-1">
+                            <button
+                              className="p-1 hover:bg-gray-200 rounded transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedChat(chat)
+                                setIsChatDetailModalOpen(true)
+                              }}
+                              title="View Details"
+                            >
+                              <EyeIcon className="w-4 h-4 text-gray-500" />
+                            </button>
+                            {chat.chat_status === 'ongoing' && (
+                              <button
+                                className="p-1 hover:bg-red-200 rounded transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  endChat(chat.chat_id)
+                                }}
+                                title="End Chat"
+                              >
+                                <StopCircleIcon className="w-4 h-4 text-red-500" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-                  // Last page
-                  if (endPage < totalPages) {
-                    if (endPage < totalPages - 1) {
-                      pages.push(<span key="ellipsis2" className="px-2 text-gray-500 dark:text-gray-400">...</span>)
-                    }
-                    pages.push(
-                      <button
-                        key={totalPages}
-                        onClick={() => setCurrentPage(totalPages)}
-                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
-                      >
-                        {totalPages}
-                      </button>
-                    )
-                  }
+                      {/* Mobile and Tablet Layout */}
+                      <div className="lg:hidden space-y-2 sm:space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${chat.chat_status === 'ongoing' ? 'bg-blue-100' :
+                                chat.chat_status === 'ended' ? 'bg-green-100' : 'bg-red-100'
+                              }`}>
+                              {chat.chat_status === 'ongoing' ?
+                                <BotIcon className="w-5 h-5 text-blue-600" /> :
+                                chat.chat_status === 'ended' ?
+                                  <CheckCircleIcon className="w-5 h-5 text-green-600" /> :
+                                  <AlertCircleIcon className="w-5 h-5 text-red-600" />
+                              }
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-sm sm:text-base text-gray-900 truncate">
+                                {patientName}
+                                {hasNotes(chat.chat_id) && (
+                                  <span className="ml-2 inline-flex items-center gap-1">
+                                    <StickyNoteIcon className="h-3 w-3 text-blue-500" />
+                                    <span className="text-xs text-blue-600 font-medium">
+                                      {getNoteCount(chat.chat_id)}
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs sm:text-sm text-gray-500 truncate">
+                                {phoneNumber || 'No phone number'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {chat.chat_status === 'ongoing' && (
+                              <button
+                                className="p-2 hover:bg-red-200 rounded transition-colors min-h-[44px] min-w-[44px] touch-manipulation"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  endChat(chat.chat_id)
+                                }}
+                              >
+                                <StopCircleIcon className="w-4 h-4 text-red-500" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
 
-                  return pages
-                })()}
+                        <div className="bg-gray-50 rounded p-2 sm:p-3">
+                          <p className="text-sm text-gray-900 line-clamp-2">
+                            {chat.transcript || 'No conversation yet'}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getChatStatusColor(chat.chat_status)}`}>
+                            {chat.chat_status}
+                          </span>
+                          {chat.chat_analysis?.user_sentiment && (
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSentimentColor(chat.chat_analysis.user_sentiment)}`}>
+                              {chat.chat_analysis.user_sentiment}
+                            </span>
+                          )}
+                          <span className="text-gray-500">
+                            {formatDateTime(chat.start_timestamp).date} {formatDateTime(chat.start_timestamp).time}
+                          </span>
+                          <span className="text-gray-500">
+                            {chat.message_with_tool_calls?.length || 0} msgs
+                          </span>
+                          <span className="text-green-600 font-medium">
+                            <CostDisplay chat={chat} />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredChatsCount / recordsPerPage)))}
-                disabled={currentPage >= Math.ceil(filteredChatsCount / recordsPerPage)}
-                className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
-              >
-                Next
-              </button>
             </div>
+          ) : (
+            <div className="text-center py-12 sm:py-16">
+              <MessageCircleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400 mx-auto mb-3 sm:mb-4" />
+              <h3 className="text-lg sm:text-xl font-medium text-gray-900 mb-2">No chat conversations found</h3>
+              <p className="text-sm sm:text-base text-gray-600">No chat conversations have been started yet.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {filteredChatsCount > recordsPerPage && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 mt-4 sm:mt-6 lg:mt-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+          <div className="flex items-center text-xs sm:text-sm text-gray-700 dark:text-gray-300 text-center sm:text-left">
+            <span>
+              Showing {((currentPage - 1) * recordsPerPage) + 1} to {Math.min(currentPage * recordsPerPage, filteredChatsCount)} of {filteredChatsCount} chats
+            </span>
           </div>
-        )}
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap justify-center">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+            >
+              Previous
+            </button>
 
-        {/* Chat Detail Modal */}
-        {selectedChat && isChatDetailModalOpen && (
-          <ChatDetailModal
-            chat={selectedChat}
-            isOpen={isChatDetailModalOpen}
-            onClose={() => {
-              setIsChatDetailModalOpen(false)
-              setSelectedChat(null)
-            }}
-            onEndChat={endChat}
-            onNotesChanged={() => refetchNotesCount()}
-          />
-        )}
+            {/* Page Numbers */}
+            <div className="flex items-center space-x-1">
+              {(() => {
+                const totalPages = Math.ceil(filteredChatsCount / recordsPerPage)
+                const pages = []
+                const startPage = Math.max(1, currentPage - 2)
+                const endPage = Math.min(totalPages, currentPage + 2)
 
-        {/* Site Help Chatbot - NO PHI ACCESS */}
-        <SiteHelpChatbot
-          isVisible={showHelpChatbot}
-          onToggle={() => setShowHelpChatbot(!showHelpChatbot)}
+                // First page
+                if (startPage > 1) {
+                  pages.push(
+                    <button
+                      key={1}
+                      onClick={() => setCurrentPage(1)}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
+                    >
+                      1
+                    </button>
+                  )
+                  if (startPage > 2) {
+                    pages.push(<span key="ellipsis1" className="px-2 text-gray-500 dark:text-gray-400">...</span>)
+                  }
+                }
+
+                // Current page range
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(
+                    <button
+                      key={i}
+                      onClick={() => setCurrentPage(i)}
+                      className={`px-3 py-2 text-sm font-medium rounded-lg ${i === currentPage
+                          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-600'
+                          : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                    >
+                      {i}
+                    </button>
+                  )
+                }
+
+                // Last page
+                if (endPage < totalPages) {
+                  if (endPage < totalPages - 1) {
+                    pages.push(<span key="ellipsis2" className="px-2 text-gray-500 dark:text-gray-400">...</span>)
+                  }
+                  pages.push(
+                    <button
+                      key={totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
+                    >
+                      {totalPages}
+                    </button>
+                  )
+                }
+
+                return pages
+              })()}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredChatsCount / recordsPerPage)))}
+              disabled={currentPage >= Math.ceil(filteredChatsCount / recordsPerPage)}
+              className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] touch-manipulation"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chat Detail Modal */}
+      {selectedChat && isChatDetailModalOpen && (
+        <ChatDetailModal
+          chat={selectedChat}
+          isOpen={isChatDetailModalOpen}
+          onClose={() => {
+            setIsChatDetailModalOpen(false)
+            setSelectedChat(null)
+          }}
+          onEndChat={endChat}
+          onNotesChanged={() => refetchNotesCount()}
         />
+      )}
 
-        {/* Toast Notifications for new records */}
-        <ToastManager userId={user?.id} />
+      {/* Site Help Chatbot - NO PHI ACCESS */}
+      <SiteHelpChatbot
+        isVisible={showHelpChatbot}
+        onToggle={() => setShowHelpChatbot(!showHelpChatbot)}
+      />
+
+      {/* Toast Notifications for new records */}
+      <ToastManager userId={user?.id} />
 
     </div>
   )

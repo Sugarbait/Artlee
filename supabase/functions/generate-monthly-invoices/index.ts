@@ -193,7 +193,7 @@ serve(async (req) => {
           customer: customerId,
           auto_advance: true,
           collection_method: 'send_invoice',
-          days_until_due: 30,
+          days_until_due: 7,
           description: `CareXPS Services - ${previousMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}`,
           metadata: {
             service: 'CareXPS Healthcare CRM',

@@ -6,7 +6,7 @@ const formatDateForInput = (date: Date) => {
   return date.toISOString().split('T')[0]
 }
 
-export type DateRange = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom'
+export type DateRange = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'last7Days' | 'last30Days' | 'thisYear' | 'allTime' | 'custom'
 
 interface DateRangePickerProps {
   selectedRange: DateRange
@@ -49,7 +49,10 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     { value: 'lastWeek' as DateRange, label: 'Last Week' },
     { value: 'thisMonth' as DateRange, label: 'This Month' },
     { value: 'lastMonth' as DateRange, label: 'Last Month' },
+    { value: 'last7Days' as DateRange, label: 'Last 7 Days' },
+    { value: 'last30Days' as DateRange, label: 'Last 30 Days' },
     { value: 'thisYear' as DateRange, label: 'This Year' },
+    { value: 'allTime' as DateRange, label: 'All Time' },
     { value: 'custom' as DateRange, label: 'Custom' }
   ]
 
@@ -106,11 +109,10 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                   <button
                     key={option.value}
                     onClick={() => handleRangeSelect(option.value)}
-                    className={`w-full text-left px-3 py-3 sm:py-2 rounded-md text-sm hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors min-h-[44px] sm:min-h-[auto] flex items-center ${
-                      selectedRange === option.value
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
+                    className={`w-full text-left px-3 py-3 sm:py-2 rounded-md text-sm hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors min-h-[44px] sm:min-h-[auto] flex items-center ${selectedRange === option.value
+                      ? 'bg-blue-50 text-blue-700 font-medium'
+                      : 'text-gray-700 dark:text-gray-300'
+                      }`}
                     aria-label={`Select ${option.label} date range`}
                   >
                     {option.label}
@@ -252,6 +254,23 @@ export const getDateRangeFromSelection = (range: DateRange, customStart?: Date, 
       const endOfYear = new Date(today.getFullYear(), 11, 31)
       endOfYear.setHours(23, 59, 59, 999)
       return { start: startOfYear, end: endOfYear }
+
+    case 'last7Days':
+      const start7Days = new Date(today)
+      start7Days.setDate(today.getDate() - 6)
+      start7Days.setHours(0, 0, 0, 0)
+      return { start: start7Days, end: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) }
+
+    case 'last30Days':
+      const start30Days = new Date(today)
+      start30Days.setDate(today.getDate() - 29)
+      start30Days.setHours(0, 0, 0, 0)
+      return { start: start30Days, end: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) }
+
+    case 'allTime':
+      // Return a very old date for 'All Time'
+      const startAllTime = new Date(2020, 0, 1) // Jan 1, 2020 (start of Retell era approx)
+      return { start: startAllTime, end: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) }
 
     case 'custom':
       if (customStart && customEnd) {

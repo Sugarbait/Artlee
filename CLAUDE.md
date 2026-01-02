@@ -12,7 +12,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **ARTLEE Tenant ID**: `'artlee'` - All ARTLEE users have `tenant_id = 'artlee'`
 - **MedEx Tenant ID**: `'medex'` - All MedEx users have `tenant_id = 'medex'`
 - **CareXPS Tenant ID**: `'carexps'` - All CareXPS users have `tenant_id = 'carexps'`
-- **Database**: Shared Supabase PostgreSQL database (`cpkslvmydfdevdftieck`)
+- **Database**: ARTLEE dedicated Supabase database (`fslniuhyunzlfcbxsiol`) - **Migrated Oct 9, 2025**
+  - **OLD**: `cpkslvmydfdevdftieck` (deprecated, do not use)
+  - **NEW**: `fslniuhyunzlfcbxsiol` (current production)
 - **RLS Policies**: Row Level Security ensures data isolation at database level
 - **Application Filtering**: All queries MUST include `.eq('tenant_id', getCurrentTenantId())` filter
 
@@ -2062,3 +2064,149 @@ interface ChatMetrics {
 4. **Type Safety**: TypeScript interfaces prevent many bugs - ensure full compliance in all setState calls
 
 **These fixes are now part of the production SMS page and MUST NOT be modified.**
+
+---
+
+## **🔄 CRITICAL FIXES - November 5, 2025 Session**
+
+### **🔴 CRITICAL: MFA Database Migration Issue**
+
+**Issue Found:** MFA system failing with "400 Bad Request" error on all MFA-related queries after database migration.
+
+**Root Cause:**
+On October 9, 2025, ARTLEE migrated to a **dedicated Supabase database** (`fslniuhyunzlfcbxsiol.supabase.co`), but the MFA admin override columns were never migrated to the new database. The `freshMfaService.ts` was querying 4 columns that don't exist:
+- `mfa_disabled_by_admin`
+- `mfa_disabled_at`
+- `mfa_disabled_by_user_id`
+- `mfa_disable_reason`
+
+**Database Information:**
+- **OLD Database** (deprecated): `cpkslvmydfdevdftieck.supabase.co`
+- **NEW Database** (current): `fslniuhyunzlfcbxsiol.supabase.co`
+- **Migration Date**: October 9, 2025
+- **Migration File**: `supabase/migrations/20251104000001_add_mfa_admin_override.sql`
+
+**Fix Applied (November 5, 2025):**
+```typescript
+// freshMfaService.ts - Lines 434-460
+// ✅ AFTER - Removed missing columns from query
+const { data, error } = await supabase
+  .from('user_settings')
+  .select(`
+    fresh_mfa_secret,
+    fresh_mfa_enabled,
+    fresh_mfa_setup_completed,
+    fresh_mfa_backup_codes
+  `)
+  .eq('user_id', userId)
+  .eq('tenant_id', getCurrentTenantId())
+  .single()
+
+return {
+  secret: data.fresh_mfa_secret,
+  enabled: data.fresh_mfa_enabled,
+  setupCompleted: data.fresh_mfa_setup_completed,
+  backupCodes: data.fresh_mfa_backup_codes ? JSON.parse(data.fresh_mfa_backup_codes) : [],
+  disabledByAdmin: false, // Admin override not available in this database
+  disabledAt: null,
+  disabledByUserId: null,
+  disableReason: null
+}
+```
+
+**Impact:**
+- ✅ MFA setup and verification now works correctly
+- ✅ QR code generation functional
+- ✅ TOTP and backup code verification working
+- ❌ Super User ability to disable MFA for other users temporarily unavailable
+
+**Next Steps:**
+To restore full MFA admin override functionality, run this SQL in Supabase SQL Editor:
+```sql
+ALTER TABLE user_settings
+ADD COLUMN IF NOT EXISTS mfa_disabled_by_admin BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS mfa_disabled_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS mfa_disabled_by_user_id TEXT,
+ADD COLUMN IF NOT EXISTS mfa_disable_reason TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_user_settings_mfa_disabled
+ON user_settings(user_id, tenant_id, mfa_disabled_by_admin)
+WHERE mfa_disabled_by_admin = TRUE;
+```
+
+**Status:** ✅ TEMPORARY FIX APPLIED - MFA functional without admin override feature
+
+---
+
+## **Important Notes for Claude**
+
+### **Database Migration Context**
+On **October 9, 2025**, ARTLEE CRM migrated from a shared database to a **dedicated Supabase database**:
+- **Old URL**: `https://cpkslvmydfdevdftieck.supabase.co` (deprecated, do not use)
+- **New URL**: `https://fslniuhyunzlfcbxsiol.supabase.co` (current production)
+- **Environment File**: `.env.local` contains the correct new credentials
+- **Migration Status**: Schema partially migrated - some features may need manual migration
+
+### **Common Database Issues After Migration**
+1. **Missing Columns**: New database may not have all columns from old schema
+2. **RLS Policies**: Policies may need to be recreated
+3. **Environment Variables**: Always verify `.env.local` has new database credentials
+4. **Dev Server Restart**: After updating `.env.local`, restart dev server to load new credentials
+
+### **MFA System Architecture**
+- **Service**: `src/services/freshMfaService.ts` - Complete TOTP/backup code implementation
+- **Components**:
+  - `FreshMfaSetup.tsx` - QR code generation and initial setup
+  - `FreshMfaVerification.tsx` - Login verification with backup codes
+  - `MandatoryMfaLogin.tsx` - MFA enforcement wrapper
+  - `FreshMfaSettings.tsx` - User settings UI
+- **Database Table**: `user_settings` table with `fresh_mfa_*` columns
+- **Storage**: Plain text MFA secrets (Base32), encrypted backup codes (JSON array)
+
+### **Troubleshooting MFA Issues**
+1. **400 Bad Request**: Check if queried columns exist in database schema
+2. **No MFA Data Found**: Verify `user_settings` record exists for user
+3. **QR Code Not Displaying**: Check `fresh_mfa_secret` column exists and is populated
+4. **Verification Failing**: Verify TOTP window setting (currently 1 = ±30 seconds)
+
+### **Development Best Practices**
+1. **Always restart dev server** after `.env.local` changes
+2. **Test database queries** with both service role and anon keys
+3. **Check schema compatibility** when adding new queries
+4. **Document all database migrations** in `supabase/migrations/`
+5. **Verify RLS policies** allow anon key access for user-specific data
+---
+
+## **🔄 RECENT FIX - December 9, 2025 Session**
+
+### **Stripe Invoice Memo Update**
+
+**Issue:** Stripe invoices were displaying "CareXPS Services" in the memo section instead of "Artlee Services".
+
+**Fix Applied:**
+- **File**: `src/services/stripeInvoiceService.ts` - Line 418
+- **Change**: Updated invoice description from `CareXPS Services - ${dateRange}` to `Artlee Services - ${dateRange}`
+- **Impact**: All new invoices generated will show correct "Artlee Services" memo on Stripe invoices
+- **Status**: ✅ LOCKED - Production build updated (dist folder rebuilt)
+
+**Note on Existing Invoices:**
+- Stripe does not allow editing finalized/sent invoices
+- To update existing invoices, either:
+  1. Void old invoices and regenerate with corrected memo
+  2. Create credit memos explaining the correction
+  3. Add customer-facing notes in Stripe dashboard
+
+---
+
+### **Stripe Invoice System**
+- **Service**: `src/services/stripeInvoiceService.ts` - Complete invoice generation
+- **Memo Field**: Line 418 controls what appears in Stripe invoice memo
+- **Metadata**: Additional fields stored in invoice metadata for tracking
+- **Customer Info**: Hardcoded to "Artlee Creative" and "create@artlee.agency" in Dashboard modal
+- **Stripe API Key**: Retrieved from environment variables or user settings
+- **Invoice Storage**: Uses localStorage for invoice history (bypasses Supabase RLS issues)
+
+### **Quick Reference: Recent Branding Updates**
+- "CareXPS Services" → "Artlee Services" (Stripe memo, stripeInvoiceService.ts)
+- "Phaeton AI" → "ARTLEE CRM" (various files across services)
+- Stripe dashboard defaults to "Artlee Creative" customer with hardcoded email

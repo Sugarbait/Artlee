@@ -13,6 +13,7 @@ import QRCode from 'qrcode'
 import { supabase } from '../config/supabase'
 import { userIdTranslationService } from './userIdTranslationService'
 import { getCurrentTenantId } from '@/config/tenantConfig'
+import { auditLogger, AuditAction, AuditOutcome, ResourceType } from './auditLogger'
 
 export interface FreshMfaSetup {
   secret: string
@@ -234,11 +235,18 @@ class FreshMfaService {
   }
 
   /**
-   * Check if user has MFA enabled
+   * Check if user has MFA enabled (includes admin override check)
    */
   static async isMfaEnabled(userId: string): Promise<boolean> {
     try {
       const mfaData = await this.getFreshMfaData(userId)
+
+      // Check if MFA has been disabled by admin
+      if (mfaData?.disabledByAdmin === true) {
+        console.log(`🔓 MFA disabled by admin for user ${userId}`)
+        return false
+      }
+
       return mfaData?.enabled === true && mfaData?.setupCompleted === true
     } catch (error) {
       console.error('❌ Error checking MFA status:', error)
@@ -417,7 +425,7 @@ class FreshMfaService {
   }
 
   /**
-   * Get fresh MFA data from database
+   * Get fresh MFA data from database (includes admin override fields)
    */
   private static async getFreshMfaData(userId: string): Promise<any> {
     // Use user ID directly - no translation needed for ARTLEE tenant
@@ -425,7 +433,12 @@ class FreshMfaService {
 
     const { data, error } = await supabase
       .from('user_settings')
-      .select('fresh_mfa_secret, fresh_mfa_enabled, fresh_mfa_setup_completed, fresh_mfa_backup_codes')
+      .select(`
+        fresh_mfa_secret,
+        fresh_mfa_enabled,
+        fresh_mfa_setup_completed,
+        fresh_mfa_backup_codes
+      `)
       .eq('user_id', userId) // Use actual user ID from users table
       .eq('tenant_id', getCurrentTenantId())
       .single()
@@ -439,7 +452,11 @@ class FreshMfaService {
       secret: data.fresh_mfa_secret,
       enabled: data.fresh_mfa_enabled,
       setupCompleted: data.fresh_mfa_setup_completed,
-      backupCodes: data.fresh_mfa_backup_codes ? JSON.parse(data.fresh_mfa_backup_codes) : []
+      backupCodes: data.fresh_mfa_backup_codes ? JSON.parse(data.fresh_mfa_backup_codes) : [],
+      disabledByAdmin: false, // Admin override not available in this database
+      disabledAt: null,
+      disabledByUserId: null,
+      disableReason: null
     }
   }
 
@@ -650,6 +667,167 @@ class FreshMfaService {
     } catch (error) {
       console.error('❌ Error getting backup codes count:', error)
       return 0
+    }
+  }
+
+  /**
+   * Admin-only: Disable MFA for a user (does not delete MFA data, just overrides it)
+   * @param userId - The user whose MFA should be disabled
+   * @param adminUserId - The Super User performing the action
+   * @param reason - Reason for disabling MFA
+   * @returns Promise<boolean> - Success status
+   */
+  static async adminDisableMfa(
+    userId: string,
+    adminUserId: string,
+    reason: string = 'Disabled by administrator'
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`🔐 Admin MFA Disable: Admin ${adminUserId} disabling MFA for user ${userId}`)
+
+      // Update the database to mark MFA as disabled by admin
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          mfa_disabled_by_admin: true,
+          mfa_disabled_at: new Date().toISOString(),
+          mfa_disabled_by_user_id: adminUserId,
+          mfa_disable_reason: reason
+        })
+        .eq('user_id', userId)
+        .eq('tenant_id', getCurrentTenantId())
+
+      if (error) {
+        console.error('❌ Error disabling MFA via admin:', error)
+        return { success: false, error: error.message }
+      }
+
+      console.log(`✅ MFA disabled by admin for user ${userId}`)
+
+      // Log audit event for MFA disable
+      try {
+        await auditLogger.logAction({
+          action: AuditAction.UPDATE,
+          resourceType: ResourceType.USER,
+          resourceId: userId,
+          outcome: AuditOutcome.SUCCESS,
+          additionalInfo: {
+            action_detail: 'MFA_DISABLED_BY_ADMIN',
+            disabled_by_user_id: adminUserId,
+            reason: reason
+          }
+        })
+      } catch (auditError) {
+        console.error('⚠️ Failed to log MFA disable audit event:', auditError)
+        // Continue even if audit logging fails
+      }
+
+      // Trigger UI update events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mfaStatusRefresh', {
+          detail: { userId, enabled: false, disabledByAdmin: true }
+        }))
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Admin MFA disable failed:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  /**
+   * Admin-only: Re-enable MFA for a user (removes admin override)
+   * @param userId - The user whose MFA should be re-enabled
+   * @returns Promise<boolean> - Success status
+   */
+  static async adminEnableMfa(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`🔐 Admin MFA Enable: Re-enabling MFA for user ${userId}`)
+
+      // Clear the admin override flags
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          mfa_disabled_by_admin: false,
+          mfa_disabled_at: null,
+          mfa_disabled_by_user_id: null,
+          mfa_disable_reason: null
+        })
+        .eq('user_id', userId)
+        .eq('tenant_id', getCurrentTenantId())
+
+      if (error) {
+        console.error('❌ Error re-enabling MFA via admin:', error)
+        return { success: false, error: error.message }
+      }
+
+      console.log(`✅ MFA admin override removed for user ${userId}`)
+
+      // Check if user still has MFA configured
+      const mfaData = await this.getFreshMfaData(userId)
+      const isEnabled = mfaData?.enabled === true && mfaData?.setupCompleted === true
+
+      // Log audit event for MFA re-enable
+      try {
+        await auditLogger.logAction({
+          action: AuditAction.UPDATE,
+          resourceType: ResourceType.USER,
+          resourceId: userId,
+          outcome: AuditOutcome.SUCCESS,
+          additionalInfo: {
+            action_detail: 'MFA_RE_ENABLED_BY_ADMIN',
+            mfa_now_active: isEnabled
+          }
+        })
+      } catch (auditError) {
+        console.error('⚠️ Failed to log MFA re-enable audit event:', auditError)
+        // Continue even if audit logging fails
+      }
+
+      // Trigger UI update events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mfaStatusRefresh', {
+          detail: { userId, enabled: isEnabled, disabledByAdmin: false }
+        }))
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Admin MFA enable failed:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  /**
+   * Get MFA status including admin override information
+   */
+  static async getMfaStatus(userId: string): Promise<{
+    enabled: boolean
+    setupCompleted: boolean
+    disabledByAdmin: boolean
+    disabledAt?: string
+    disabledByUserId?: string
+    disableReason?: string
+  }> {
+    try {
+      const mfaData = await this.getFreshMfaData(userId)
+
+      return {
+        enabled: mfaData?.enabled === true && mfaData?.setupCompleted === true && !mfaData?.disabledByAdmin,
+        setupCompleted: mfaData?.setupCompleted === true,
+        disabledByAdmin: mfaData?.disabledByAdmin === true,
+        disabledAt: mfaData?.disabledAt,
+        disabledByUserId: mfaData?.disabledByUserId,
+        disableReason: mfaData?.disableReason
+      }
+    } catch (error) {
+      console.error('❌ Error getting MFA status:', error)
+      return {
+        enabled: false,
+        setupCompleted: false,
+        disabledByAdmin: false
+      }
     }
   }
 }

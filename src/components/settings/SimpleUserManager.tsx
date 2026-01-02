@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { UserPlus, Trash2, Key, Lock, Unlock, UserCheck, UserX, Clock, Shield, User as UserIcon, ArrowRight } from 'lucide-react'
+import { UserPlus, Trash2, Key, Lock, Unlock, UserCheck, UserX, Clock, Shield, User as UserIcon, ArrowRight, ShieldOff, ShieldCheck } from 'lucide-react'
 import { userManagementService } from '@/services/userManagementService'
 import { userProfileService } from '@/services/userProfileService'
 import { PasswordDebugger } from '@/utils/passwordDebug'
 import { generalToast } from '@/services/generalToastService'
 import { useConfirmation } from '@/components/common/ConfirmationModal'
+import FreshMfaService from '@/services/freshMfaService'
 
 interface User {
   id: string
@@ -15,6 +16,8 @@ interface User {
   isActive?: boolean
   lastLogin?: string
   created_at?: string
+  mfaEnabled?: boolean
+  mfaDisabledByAdmin?: boolean
 }
 
 export const SimpleUserManager: React.FC = () => {
@@ -80,7 +83,11 @@ export const SimpleUserManager: React.FC = () => {
       if (response.status === 'success' && response.data) {
         console.log(`✅ DEBUG: Loaded ${response.data.length} users from service`)
 
-        const mappedUsers = response.data.map(u => {
+        // Load MFA status for all users in parallel
+        const mappedUsersPromises = response.data.map(async (u) => {
+          // Get MFA status for each user
+          const mfaStatus = await FreshMfaService.getMfaStatus(u.id)
+
           const mapped = {
             id: u.id,
             name: u.name,
@@ -93,11 +100,15 @@ export const SimpleUserManager: React.FC = () => {
                        u.email?.toLowerCase() === 'guest@email.com') ? false : (u.isLocked || false),
             isActive: u.isActive !== undefined ? u.isActive : true, // Default to true for existing users
             lastLogin: u.lastLogin,
-            created_at: (u as any).created_at // Include creation timestamp to identify first user
+            created_at: (u as any).created_at, // Include creation timestamp to identify first user
+            mfaEnabled: mfaStatus.enabled,
+            mfaDisabledByAdmin: mfaStatus.disabledByAdmin
           }
-          console.log(`👤 DEBUG: User ${u.email} - isActive: ${mapped.isActive} (original: ${u.isActive})`)
+          console.log(`👤 DEBUG: User ${u.email} - isActive: ${mapped.isActive}, MFA: ${mapped.mfaEnabled}, MFA Disabled by Admin: ${mapped.mfaDisabledByAdmin}`)
           return mapped
         })
+
+        const mappedUsers = await Promise.all(mappedUsersPromises)
 
         setUsers(mappedUsers)
         console.log('✅ DEBUG: Set users state with', mappedUsers.length, 'users')
@@ -432,6 +443,129 @@ export const SimpleUserManager: React.FC = () => {
     }
   }
 
+  const handleToggleMfa = async (user: User) => {
+    // Get current user to use as admin ID
+    const currentUserStr = localStorage.getItem('currentUser')
+    if (!currentUserStr) {
+      generalToast.error('Could not identify current user', 'Error')
+      return
+    }
+
+    const currentUser = JSON.parse(currentUserStr)
+    const isMfaCurrentlyDisabled = user.mfaDisabledByAdmin === true
+
+    const confirmed = await confirm({
+      title: isMfaCurrentlyDisabled ? '🔐 Re-enable MFA' : '⚠️ Disable MFA',
+      message: '', // Will use richContent instead
+      type: isMfaCurrentlyDisabled ? 'success' : 'warning',
+      confirmText: isMfaCurrentlyDisabled ? 'Re-enable MFA' : 'Disable MFA',
+      cancelText: 'Cancel',
+      customIcon: (
+        <div className={`relative flex items-center justify-center w-20 h-20 rounded-full ${
+          isMfaCurrentlyDisabled
+            ? 'bg-gradient-to-br from-green-500 to-emerald-600'
+            : 'bg-gradient-to-br from-amber-500 to-orange-600'
+        } shadow-lg`}>
+          {isMfaCurrentlyDisabled ? (
+            <ShieldCheck className="w-10 h-10 text-white" strokeWidth={2.5} />
+          ) : (
+            <ShieldOff className="w-10 h-10 text-white" strokeWidth={2.5} />
+          )}
+        </div>
+      ),
+      richContent: (
+        <div className="space-y-4">
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+            {user.name}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {user.email}
+          </p>
+
+          <div className={`p-3 rounded-lg ${
+            isMfaCurrentlyDisabled
+              ? 'bg-green-50 dark:bg-green-900/20'
+              : 'bg-amber-50 dark:bg-amber-900/20'
+          }`}>
+            <p className={`text-sm ${
+              isMfaCurrentlyDisabled
+                ? 'text-green-800 dark:text-green-200'
+                : 'text-amber-800 dark:text-amber-200'
+            }`}>
+              {isMfaCurrentlyDisabled ? (
+                <>
+                  This will <strong>remove the admin override</strong> and allow the user's MFA settings to apply normally.
+                  {user.mfaEnabled && ' The user has MFA configured and it will be active again.'}
+                </>
+              ) : (
+                <>
+                  This will <strong>disable MFA</strong> for this user via administrator override.
+                  The user will be able to log in without MFA verification until you re-enable it.
+                </>
+              )}
+            </p>
+          </div>
+
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2">
+            {isMfaCurrentlyDisabled
+              ? 'Are you sure you want to re-enable MFA for this user?'
+              : 'Are you sure you want to disable MFA for this user?'
+            }
+          </p>
+        </div>
+      )
+    })
+
+    if (!confirmed) return
+
+    setIsLoading(true)
+    try {
+      console.log(`🔐 Toggling MFA for ${user.email}`)
+
+      let result
+      if (isMfaCurrentlyDisabled) {
+        // Re-enable MFA (remove admin override)
+        result = await FreshMfaService.adminEnableMfa(user.id)
+      } else {
+        // Disable MFA (add admin override)
+        result = await FreshMfaService.adminDisableMfa(
+          user.id,
+          currentUser.id,
+          'Disabled by Super User via User Management'
+        )
+      }
+
+      if (result.success) {
+        // Update UI state
+        setUsers(prevUsers =>
+          prevUsers.map(u =>
+            u.id === user.id
+              ? {
+                  ...u,
+                  mfaDisabledByAdmin: !isMfaCurrentlyDisabled,
+                  mfaEnabled: isMfaCurrentlyDisabled ? u.mfaEnabled : false
+                }
+              : u
+          )
+        )
+
+        generalToast.success(
+          isMfaCurrentlyDisabled
+            ? `MFA re-enabled for ${user.name}`
+            : `MFA disabled for ${user.name}`,
+          'MFA Status Updated'
+        )
+      } else {
+        generalToast.error(`Failed to update MFA: ${result.error}`, 'Update Failed')
+      }
+    } catch (error: any) {
+      console.error('❌ MFA toggle failed:', error)
+      generalToast.error(`Error toggling MFA: ${error.message}`, 'Error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const pendingUsers = users.filter(u => !u.isActive)
   const activeUsers = users.filter(u => u.isActive)
 
@@ -568,6 +702,7 @@ export const SimpleUserManager: React.FC = () => {
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Name</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Email</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Role</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">MFA</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Last Login</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Status</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300">Actions</th>
@@ -587,6 +722,24 @@ export const SimpleUserManager: React.FC = () => {
                     }`}>
                       {user.role === 'super_user' ? 'Super User' : 'User'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {user.mfaDisabledByAdmin ? (
+                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                        <ShieldOff className="w-3 h-3" />
+                        <span className="text-xs">Disabled by Admin</span>
+                      </span>
+                    ) : user.mfaEnabled ? (
+                      <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span className="text-xs">Enabled</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-gray-400">
+                        <Shield className="w-3 h-3" />
+                        <span className="text-xs">Not Setup</span>
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                     <span className={user.lastLogin ? "" : "text-gray-400"}>
@@ -629,6 +782,34 @@ export const SimpleUserManager: React.FC = () => {
                           ) : (
                             <Shield className="w-4 h-4" />
                           )}
+                        </button>
+                      )}
+
+                      {/* MFA Toggle Button */}
+                      {user.mfaEnabled || user.mfaDisabledByAdmin ? (
+                        <button
+                          onClick={() => handleToggleMfa(user)}
+                          className={`p-1 rounded ${
+                            user.mfaDisabledByAdmin
+                              ? 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900'
+                              : 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900'
+                          }`}
+                          title={user.mfaDisabledByAdmin ? 'Re-enable MFA' : 'Disable MFA'}
+                          disabled={isLoading}
+                        >
+                          {user.mfaDisabledByAdmin ? (
+                            <ShieldCheck className="w-4 h-4" />
+                          ) : (
+                            <ShieldOff className="w-4 h-4" />
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          className="p-1 text-gray-400 cursor-not-allowed rounded"
+                          title="User has not set up MFA"
+                          disabled
+                        >
+                          <Shield className="w-4 h-4" />
                         </button>
                       )}
 
